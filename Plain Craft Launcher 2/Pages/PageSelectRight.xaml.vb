@@ -213,10 +213,13 @@ Public Class PageSelectRight
             '从 UI 中移除
             If Instance.DisplayType = McInstanceCardType.Hidden OrElse Not Instance.IsStar Then
                 '仅出现在当前卡片
-                Dim Parent As StackPanel = Item.Parent
-                If Parent.Children.Count > 2 Then '当前的项目与一个占位符
+                Dim Parent As StackPanel = TryCast(Item.Parent, StackPanel)
+                Dim Card As MyCard = If(Parent Is Nothing, Nothing, TryCast(Parent.Parent, MyCard))
+                If Parent Is Nothing OrElse Card Is Nothing Then
+                    '该项目已不在界面中（例如删除确认期间列表被刷新），无法就地移除，改为刷新整个列表
+                    LoaderFolderRun(McInstanceListLoader, McFolderSelected, LoaderFolderRunType.ForceRun, MaxDepth:=1, ExtraPath:="versions\")
+                ElseIf Parent.Children.Count > 2 Then '当前的项目与一个占位符
                     '删除后还有剩
-                    Dim Card As MyCard = Parent.Parent
                     Card.Title = Card.Title.Replace(Parent.Children.Count - 1, Parent.Children.Count - 2) '有一个占位符
                     Parent.Children.Remove(Item)
                     If McInstanceSelected IsNot Nothing AndAlso PathUtils.IsSame(Instance.PathVersion, McInstanceSelected.PathVersion) Then
