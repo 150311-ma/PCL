@@ -166,8 +166,15 @@ Public Module ModWatcher
                     'Else
                     If State = MinecraftState.Loading Then
                         '窗口未出现
-                        WatcherLog("Minecraft 尚未加载完成，可能已崩溃", LogLevel.Error)
-                        Crashed()
+                        If GameProcess.ExitCode = 0 Then
+                            '返回值为 0，说明该进程是主动、正常退出的，而不是异常终止。
+                            '例如 lwjgl3ify 会在拉起真正的游戏进程后自行关闭，此时被监视的进程返回值就是 0，不应判定为崩溃（#8943）
+                            WatcherLog("Minecraft 尚未加载完成，但返回值为 0，视为正常退出")
+                            State = MinecraftState.Ended
+                        Else
+                            WatcherLog("Minecraft 尚未加载完成，可能已崩溃", LogLevel.Error)
+                            Crashed()
+                        End If
                     ElseIf GameProcess.ExitCode <> 0 AndAlso State = MinecraftState.Running AndAlso Instance.ReleaseTime.Year >= 2012 Then
                         '返回值不为 0 且未结束
                         WatcherLog("Minecraft 返回值异常，可能已崩溃", LogLevel.Error)
