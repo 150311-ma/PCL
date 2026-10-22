@@ -310,13 +310,10 @@ Public Module ModWatcher
         ''' Nothing 代表未找到。
         ''' </summary>
         Private Function TryGetMinecraftWindow() As KeyValuePair(Of IntPtr, String)?
-            '先寻找属于游戏进程本身的窗口（Owned），找不到再退回原有的「此后启动的进程」判断（Fallback）。
-            '否则可能误匹配到其他程序的同类窗口：Steam 的窗口类名为 SDL_app，一旦被选中，
-            'IsWindowFinished 会立刻置为 True 并停止继续查找，真正的游戏窗口就再也匹配不上了（#9501）
-            Dim Owned = Nothing, Fallback = Nothing
+            Dim Result = Nothing
             EnumWindows(
                 Sub(hwnd As IntPtr, lParam As Integer)
-                    If Owned IsNot Nothing Then Return
+                    If Result IsNot Nothing Then Return
                     '检查类名
                     Dim str As New StringBuilder(512)
                     GetClassName(hwnd, str, str.Capacity)
@@ -335,16 +332,20 @@ Public Module ModWatcher
                     '获取窗口关联的进程
                     Dim ProcessId As Integer
                     GetWindowThreadProcessId(hwnd, ProcessId)
+                    If ProcessId = GameProcess.Id Then '正是游戏进程自己的窗口，优先采用
+                        Owned = New KeyValuePair(Of IntPtr, String)(hwnd, WindowText)
+                        Return
+                    End If
                     Try
-                        If Process.GetProcessById(ProcessId).StartTime < GameProcess.StartTime Then Return '需要是此后启动的进程
+                        If Process.GetProcessById(ProcessId).StartTime < GameProcess.StartTime Then Return '需要是此后启动的进程（例如游戏自行拉起的子进程）
                     Catch ex As Exception
                         Logger.Warn(ex, "枚举 Minecraft 窗口进程失败")
                         Return
                     End Try
-                    '返回
-                    Result = New KeyValuePair(Of IntPtr, String)(hwnd, WindowText)
+                    If Fallback Is Nothing Then Fallback = New KeyValuePair(Of IntPtr, String)(hwnd, WindowText)
                 End Sub, 0)
-            Return Result
+            '返回
+            Return If(Owned, Fallback)
         End Function
         Private Delegate Sub EnumWindowsSub(hwnd As IntPtr, lParam As Integer)
         Private Declare Function EnumWindows Lib "user32" (hWnd As EnumWindowsSub, lParam As Integer) As Boolean
