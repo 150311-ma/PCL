@@ -310,10 +310,13 @@ Public Module ModWatcher
         ''' Nothing 代表未找到。
         ''' </summary>
         Private Function TryGetMinecraftWindow() As KeyValuePair(Of IntPtr, String)?
-            Dim Result = Nothing
+            '先寻找属于游戏进程本身的窗口（Owned），找不到再退回原有的「此后启动的进程」判断（Fallback）。
+            '否则可能误匹配到其他程序的同类窗口：Steam 的窗口类名为 SDL_app，一旦被选中，
+            'IsWindowFinished 会立刻置为 True 并停止继续查找，真正的游戏窗口就再也匹配不上了（#9501）
+            Dim Owned = Nothing, Fallback = Nothing
             EnumWindows(
                 Sub(hwnd As IntPtr, lParam As Integer)
-                    If Result IsNot Nothing Then Return
+                    If Owned IsNot Nothing Then Return
                     '检查类名
                     Dim str As New StringBuilder(512)
                     GetClassName(hwnd, str, str.Capacity)
