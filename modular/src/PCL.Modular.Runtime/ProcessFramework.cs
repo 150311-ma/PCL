@@ -26,6 +26,7 @@ namespace PCL.Modular.Runtime
         private readonly string _dataDirectory;
         private readonly object _lock = new object();
         private Process _process;
+        private FrameworkJob _job;
         private bool _stopping;
 
         public ProcessFramework(ModuleManifest manifest, ILogger log, string dataDirectory)
@@ -84,6 +85,8 @@ namespace PCL.Modular.Runtime
                 try { code = _process.ExitCode; } catch { }
                 _log.Info($"{Id} 进程结束（退出码 {code}）");
                 FrameworkRegistry.Unregister(Id);
+                _job?.Dispose();
+                _job = null;
                 Exited?.Invoke(this, code);
             };
 
@@ -92,6 +95,14 @@ namespace PCL.Modular.Runtime
 
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
+
+            // 给它套一根回收绳：宿主死了它跟着死，内存 1 GB、进程树最多 8 个
+            _job = new FrameworkJob();
+            if (_job.Attach(_process.Handle, 1024L * 1024 * 1024, 8))
+                _log.Info($"{Id} 已纳入作业对象（内存上限 1 GB，最多 8 个进程）");
+            else
+                _log.Warn($"{Id} 没能纳入作业对象，宿主退出后可能留下孤儿进程");
+
             FrameworkRegistry.Register(this);
 
             SendControl(new JObject { ["type"] = "init", ["id"] = Id, ["dataDir"] = _dataDirectory, ["peers"] = new JArray(FrameworkRegistry.Ids.Where(x => x != Id)) });
@@ -127,6 +138,8 @@ namespace PCL.Modular.Runtime
             {
                 _stopping = false;
                 FrameworkRegistry.Unregister(Id);
+                _job?.Dispose();
+                _job = null;
             }
         }
 
@@ -137,8 +150,13 @@ namespace PCL.Modular.Runtime
                 lock (_lock)
                 {
                     if (_process == null || _process.HasExited) return;
-                    _process.StandardInput.WriteLine(line);
-                    _process.StandardInput.Flush();
+
+                    // 必须自己写 UTF-8 字节：.NET Framework 的 StandardInput 用 Encoding.Default（这里是 GBK），
+                    // 而 Python 3 那边按 UTF-8 解——中文一进去就 UnicodeDecodeError，子进程直接退出。
+                    // StandardInputEncoding 是 .NET Core 才有的，net48 只能绕过它的 StreamWriter。
+                    var bytes = Encoding.UTF8.GetBytes(line + "\n");
+                    _process.StandardInput.BaseStream.Write(bytes, 0, bytes.Length);
+                    _process.StandardInput.BaseStream.Flush();
                 }
             }
             catch (Exception ex)

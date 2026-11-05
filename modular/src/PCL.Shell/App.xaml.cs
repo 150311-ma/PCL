@@ -11,6 +11,12 @@ namespace PCL.Shell
     /// </summary>
     public partial class App : Application
     {
+        public App()
+        {
+            // 必须赶在任何窗口之前
+            DpiHelper.Enable();
+        }
+
         private ModuleHost _host;
         private System.Windows.Forms.NotifyIcon _tray;
         private MainWindow _window;
