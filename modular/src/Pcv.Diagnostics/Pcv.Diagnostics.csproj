@@ -5,6 +5,7 @@
     <RootNamespace>pcv.diagnostics</RootNamespace>
     <AssemblyName>Pcv.Diagnostics</AssemblyName>
     <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 

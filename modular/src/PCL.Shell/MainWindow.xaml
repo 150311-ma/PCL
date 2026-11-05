@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="PAINCHARNWAV" Height="730" Width="1000" MinHeight="620" MinWidth="840"
+        Title="PAINCHARNWAV" Height="820" Width="1120" MinHeight="660" MinWidth="900"
         WindowStyle="None" ResizeMode="CanResize" Background="#F3F6FB"
         WindowStartupLocation="CenterScreen" Icon="/assets/pcv.png"
         FontFamily="PingFang SC, MiSans, Microsoft YaHei UI, 微软雅黑" FontSize="13"
@@ -241,18 +241,52 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Width="40" Height="40" CornerRadius="13" Background="{DynamicResource ColorBrush6}"
+                                        <!-- 主要的动作放左边：先能打开用，再谈卸载 -->
+                                        <Button Content="打开使用它" Tag="{Binding Id}" Click="BtnOpenModule_Click"
+                                                Height="30" Padding="13,0" FontSize="11.5" VerticalAlignment="Center"
+                                                Cursor="Hand" BorderThickness="1" Margin="0,0,14,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+                                                    <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush6}" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border x:Name="Shell" Background="{TemplateBinding Background}"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="15">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"
+                                                                                      Margin="{TemplateBinding Padding}" />
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Shell" Property="Background"
+                                                                                Value="{DynamicResource ColorBrush6}" />
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+
+                                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="13" Background="{DynamicResource ColorBrush6}"
                                                 VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Initial}" FontSize="13" FontWeight="Bold"
                                                        Foreground="{DynamicResource ColorBrush2}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
 
-                                        <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="2" Margin="14,0,12,0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource ColorBrush1}" />
@@ -267,7 +301,7 @@
                                                        Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
 
-                                        <Button Grid.Column="2" Content="卸载" Tag="{Binding Id}"
+                                        <Button Grid.Column="3" Content="卸载" Tag="{Binding Id}"
                                                 Click="BtnUninstall_Click" Height="28"
                                                 Padding="12,0" FontSize="11.5" VerticalAlignment="Center">
                                             <Button.Style>
@@ -407,6 +441,10 @@
                             </StackPanel>
                         </StackPanel>
                     </Grid>
+
+                    <Button Content="或者，直接贴一段 Python 跑 →" HorizontalAlignment="Left" Margin="6,26,0,0"
+                            Background="Transparent" BorderThickness="0" Cursor="Hand" FontSize="12.5"
+                            Foreground="{DynamicResource ColorBrush3}" Click="BtnPasteScript_Click" />
 
                     <Border x:Name="PanCopied" Background="#3322A06B" CornerRadius="12" Padding="14,11" Margin="0,18,0,0"
                             Visibility="Collapsed">

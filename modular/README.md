@@ -271,3 +271,62 @@ AI 只要替换内容就行，不用它自己发明结构。契约程序集路�
 - `Environment.OSVersion` 在这个进程里把 Win11 报成 `6.2.9200`（Win8），因为进程没声明支持的系统版本。
   改成读注册表 `CurrentBuild`，并且 build ≥ 22000 时把名字里的 "Windows 10" 换回 "Windows 11"
   ——微软自己在注册表里都还写着 Windows 10。
+
+## 十二、进程型框架：任何语言都能写（2026-11-05 追加）
+
+原来框架包必须是 .NET 程序集，这轮把这条限制拆了。现在有两种形态，靠 `module.json` 的 `kind` 区分：
+
+| kind | 是什么 | 怎么跑 | 窗口 |
+| --- | --- | --- | --- |
+| `assembly`（默认） | .NET DLL | 宿主进程内加载 | `FrameworkWindow` |
+| `process` | 任意可执行/脚本 | `Process` 起子进程 | `ProcessWindow`（深色，输出 + 输入） |
+
+进程型的清单长这样：
+
+```json
+{ "id": "pcv.py.demo", "name": "Python 示例框架", "version": "1.0.0",
+  "kind": "process", "runtime": "python", "script": "main.py" }
+```
+
+`runtime` 支持 `python` / `node` / `exec`（直接执行 script 指向的文件，exe、bat、jar 都走这条）。
+语言支持不是靠给每种语言写 SDK，而是靠协议足够土：
+
+### 一行一条的协议
+
+- **普通行**：框架 `print` 什么，窗口就显示什么；
+- **`@@PCV ` 开头的行**：控制消息，JSON。目前三种：
+  - `{"type":"title","text":"..."}` 改窗口标题
+  - `{"type":"call","target":"pcv.x","text":"..."}` 调另一个框架（宿主转发，双方拿不到对方的进程信息）
+  - `{"type":"log","text":"..."}` 写进宿主日志
+- **宿主发给框架**：`{"type":"init"}`（含 `peers` 列表）、`{"type":"peer"}`（别的框架发来的）、`{"type":"stop"}`。
+
+任何能读写 stdin/stdout 的语言都能接。`samples/py-demo/main.py` 是完整例子（只用标准库）。
+
+### 粘贴脚本直接跑
+
+第二页多了一个入口：贴一段 Python → 点运行 → 落到 `PCLData\pasted\<id>\main.py`，
+写一份 `module.json`，走和 `.pclpkg` 完全一样的运行路径。不建工程、不编译。
+
+### 启动即隐身
+
+主窗口启动后直接 `Hide()`，只留托盘图标（双击回到主界面，右键菜单可退出）。
+框架各自是独立窗口；清单里 `"autoStart": true` 的进程型框架会在启动时自动拉起。
+
+### 隔离到底做到哪一步（别被"沙箱"两个字骗了）
+
+做到：
+- 框架是独立进程，**拿不到宿主的任何对象**，只能通过上面那套消息请求宿主代劳；
+- 工作目录 = 框架自己的目录，数据目录 = `PCLData\frameworks\<id>`，互不干扰；
+- 宿主不把环境变量原样递过去（顺带绕开了 `HTTPS_PROXY`/`https_proxy` 撞车导致启动失败的问题）。
+
+**没做到**：文件系统层面的硬隔离。子进程和宿主同一个用户，理论上能读到宿主的文件。
+要真挡住，需要 AppContainer 或低权限账户，这轮没做。与其说"它读不到"，不如说
+"它拿不到宿主的对象，宿主也没把钥匙交给它"——这是能力白名单，不是内核沙箱。
+
+### 这轮踩的三个坑
+
+1. `ProcessStartInfo.EnvironmentVariables` 在本机直接抛"已添加项"——环境里同时有
+   `HTTPS_PROXY` 和 `https_proxy`，内部那个大小写不敏感字典崩了。改成走命令行参数。
+2. 加载器会把 `kind=process` 的包当程序集去 `Assembly.LoadFrom`，报 `path2 为 null`。
+   现在 `Discover` 阶段就把它们筛掉，交给运行时。
+3. 壳里的卡片列表原来只按"加载结果"生成，进程型框架根本不在列表里。改成以 `ListInstalled()` 为准。

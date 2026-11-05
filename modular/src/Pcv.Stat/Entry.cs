@@ -9,16 +9,16 @@ namespace Pcv.Stat
     /// 用了几次、从哪天开始用的、这次开了多久。
     /// 只记本地数字，不上传，不发网络请求。
     /// </summary>
-    public sealed class Entry : IPclModule
+    public sealed partial class Entry : IPclModule
     {
-        private const string KeyStarts = "StatStarts";
-        private const string KeyFirst = "StatFirstSeen";
-        private const string KeySeconds = "StatSeconds";
-        private const string KeyLastStart = "StatLastStart";
+        internal const string KeyStarts = "StatStarts";
+        internal const string KeyFirst = "StatFirstSeen";
+        internal const string KeySeconds = "StatSeconds";
+        internal const string KeyLastStart = "StatLastStart";
 
         private IModuleContext _context;
-        private ISettingsService _settings;
-        private DateTime _sessionStart;
+        internal ISettingsService _settings;
+        internal DateTime _sessionStart;
 
         public void OnLoad(IModuleContext context)
         {
@@ -62,14 +62,14 @@ namespace Pcv.Stat
             _context.Log.Info($"这次开了 {(seconds / 60.0):0.#} 分钟，已记下");
         }
 
-        private int Read(string key) => _settings == null ? 0 : _settings.GetValue(key, 0);
+        internal int Read(string key) => _settings == null ? 0 : _settings.GetValue(key, 0);
 
-        private void Write(string key, int value)
+        internal void Write(string key, int value)
         {
             if (_settings == null) return;
             _settings.SetValue(key, value);
         }
 
-        private static int Now() => (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        internal static int Now() => (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 }

@@ -103,6 +103,13 @@ namespace PCL.Modular.Host
                     manifest.DirectoryPath = Path.GetDirectoryName(file);
                     entry.Manifest = manifest;
 
+                    // 进程型框架不是程序集，加载器不管它；它由 PCL.Modular.Runtime 起进程
+                    if (string.Equals(manifest.Kind, "process", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _log.Info($"{manifest.Id} 是进程型框架，交给运行时管理，不参与程序集加载");
+                        continue;
+                    }
+
                     var errors = manifest.Validate();
                     if (errors.Count > 0)
                     {
@@ -255,6 +262,7 @@ namespace PCL.Modular.Host
                         Events,
                         _hostInfo);
 
+                    entry.Context = context;
                     instance.OnLoad(context);
                     entry.State = ModuleState.Loaded;
                     _log.Info($"已加载 {entry.Id}@{entry.Manifest.Version}（{watch.ElapsedMilliseconds} ms）");

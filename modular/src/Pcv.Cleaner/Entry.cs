@@ -12,7 +12,7 @@ namespace Pcv.Cleaner
     /// 删除这件事不能图快：这里每删一个目录都先算大小、再判断年龄、最后才动手，
     /// 而且全程只在自己算出来的候选清单里操作，绝不用通配符扫全盘。
     /// </summary>
-    public sealed class Entry : IPclModule
+    public sealed partial class Entry : IPclModule
     {
         private const int TrashKeepDays = 3;   // .trash 里的东西留 3 天，万一卸错了还能捞回来
         private const int BackupKeepDays = 7;  // 旧版本包留 7 天
@@ -26,12 +26,9 @@ namespace Pcv.Cleaner
         {
             try
             {
-                var freed = 0L;
-                var removed = new List<string>();
-
-                freed += CleanDotFolder(".trash", TrashKeepDays, removed);
-                freed += CleanDotFolder(".backup", BackupKeepDays, removed);
-                freed += CleanLogs(removed);
+                var result = CleanNow();
+                var freed = result.Item1;
+                var removed = result.Item2;
 
                 if (removed.Count == 0)
                 {
@@ -51,6 +48,40 @@ namespace Pcv.Cleaner
 
         public void OnStop()
         {
+        }
+
+        /// <summary>立即清一次，返回（腾出的字节数, 删掉的路径清单）。</summary>
+        internal Tuple<long, List<string>> CleanNow()
+        {
+            var removed = new List<string>();
+            var freed = 0L;
+            freed += CleanDotFolder(".trash", TrashKeepDays, removed);
+            freed += CleanDotFolder(".backup", BackupKeepDays, removed);
+            freed += CleanLogs(removed);
+            return Tuple.Create(freed, removed);
+        }
+
+        /// <summary>只是看看有多少可清，不动手。</summary>
+        internal Tuple<int, long> Survey()
+        {
+            var count = 0;
+            var bytes = 0L;
+            var deadline = DateTime.Now.AddDays(-Math.Min(TrashKeepDays, BackupKeepDays));
+
+            foreach (var folderName in new[] { ".trash", ".backup" })
+            {
+                var folder = Path.Combine(_context.Host.ModulesDirectory, folderName);
+                if (!Directory.Exists(folder)) continue;
+                foreach (var directory in SafeDirectories(folder))
+                {
+                    var info = new DirectoryInfo(directory);
+                    if (info.CreationTime > deadline) continue;
+                    count++;
+                    bytes += SizeOf(info);
+                }
+            }
+
+            return Tuple.Create(count, bytes);
         }
 
         private long CleanDotFolder(string folderName, int keepDays, List<string> removed)

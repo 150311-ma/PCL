@@ -12,7 +12,7 @@ namespace Pcv.Diagnostics
     /// 环境自检。跑一遍，把结果写成一份报告丢在 logs\ 里。
     /// 出问题的时候，用户只要把这份文件发过来，就不用再问"你什么系统、装了几个包、盘还剩多少"。
     /// </summary>
-    public sealed class Entry : IPclModule
+    public sealed partial class Entry : IPclModule
     {
         private IModuleContext _context;
 
@@ -26,11 +26,7 @@ namespace Pcv.Diagnostics
         {
             try
             {
-                var report = Collect();
-                var folder = Path.Combine(_context.Host.BaseDirectory, "logs");
-                Directory.CreateDirectory(folder);
-                var file = Path.Combine(folder, $"diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-                File.WriteAllText(file, report, Encoding.UTF8);
+                RunAndSave(out var file);
                 _context.Log.Info("自检报告：" + file);
             }
             catch (Exception ex)
@@ -39,11 +35,22 @@ namespace Pcv.Diagnostics
             }
         }
 
+        /// <summary>跑一遍自检并写文件，返回报告正文与路径。界面上的"重新自检"也走这里。</summary>
+        internal string RunAndSave(out string file)
+        {
+            var report = Collect();
+            var folder = Path.Combine(_context.Host.BaseDirectory, "logs");
+            Directory.CreateDirectory(folder);
+            file = Path.Combine(folder, $"diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+            File.WriteAllText(file, report, Encoding.UTF8);
+            return report;
+        }
+
         public void OnStop()
         {
         }
 
-        private string Collect()
+        internal string Collect()
         {
             var lines = new List<string>
             {

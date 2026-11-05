@@ -21,6 +21,9 @@ namespace PCL.Modular.Host
     /// <summary>运行时的一个模块实例，记录状态、耗时与失败原因。</summary>
     public sealed class ModuleEntry
     {
+        /// <summary>加载时创建的上下文。界面要打开框架时得把同一个上下文交给它。</summary>
+        public IModuleContext Context { get; internal set; }
+
         public ModuleManifest Manifest { get; internal set; }
         public ModuleState State { get; internal set; } = ModuleState.Discovered;
         public string Error { get; internal set; }
@@ -193,10 +196,23 @@ namespace PCL.Modular.Host
             Services = services;
             Events = events;
             Host = host;
+
+            // 每个框架一个自己的数据目录；建不出来就退回模块目录，不让它因此起不来
+            try
+            {
+                var dataDirectory = Path.Combine(host.BaseDirectory, "PCLData", "frameworks", manifest.Id);
+                Directory.CreateDirectory(dataDirectory);
+                DataDirectory = dataDirectory;
+            }
+            catch
+            {
+                DataDirectory = directory;
+            }
         }
 
         public ModuleManifest Manifest { get; }
         public string ModuleDirectory { get; }
+        public string DataDirectory { get; }
         public ILogger Log { get; }
         public IServiceRegistry Services { get; }
         public IEventBus Events { get; }

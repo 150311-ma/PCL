@@ -37,6 +37,12 @@ namespace PCL.Modular.Abstractions
         ModuleManifest Manifest { get; }
         /// <summary>模块所在目录（含 module.json 与依赖 dll）。</summary>
         string ModuleDirectory { get; }
+
+        /// <summary>
+        /// 这个框架自己的数据目录，互不干扰（PCLData\frameworks\&lt;id&gt;）。
+        /// 配置仍然走 ISettingsService 共享，文件各放各的——这就是"运行空间隔离、数据互通"的落点。
+        /// </summary>
+        string DataDirectory { get; }
         ILogger Log { get; }
         IServiceRegistry Services { get; }
         IEventBus Events { get; }

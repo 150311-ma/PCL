@@ -6,6 +6,20 @@ using System.Threading.Tasks;
 namespace PCL.Modular.Contracts
 {
     /// <summary>
+    /// 框架如果想在界面上"被打开"，就实现这个接口。
+    /// 返回值按 WPF 的 FrameworkElement 使用——契约程序集不引用 WPF，所以这里只能是 object，
+    /// 这是故意的：非 UI 的框架（比如只做后台清理的）不需要为此拖一个 WPF 依赖进来。
+    /// </summary>
+    public interface IFrameworkSurface
+    {
+        /// <summary>窗口标题。</summary>
+        string Title { get; }
+
+        /// <summary>创建界面。宿主会把它塞进窗口里。</summary>
+        object CreateView(Abstractions.IModuleContext context);
+    }
+
+    /// <summary>
     /// 跨模块契约：放在 Abstractions 里，模块之间只依赖接口，不互相引用程序集。
     /// 这样 UI 模块可以用到主题/登录能力，而不需要编译期知道谁实现了它。
     /// </summary>

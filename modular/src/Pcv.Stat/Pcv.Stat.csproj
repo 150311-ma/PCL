@@ -5,6 +5,7 @@
     <RootNamespace>pcv.stat</RootNamespace>
     <AssemblyName>Pcv.Stat</AssemblyName>
     <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 

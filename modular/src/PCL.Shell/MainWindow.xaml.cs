@@ -21,6 +21,7 @@ namespace PCL.Shell
         private const string DeepSeekUrl = "https://chat.deepseek.com/";
 
         private readonly ModuleHost _host;
+        private readonly ModuleHostAccessor _accessor;
         private readonly PackageInstaller _installer;
         private readonly ObservableCollection<FrameworkCard> _cards = new ObservableCollection<FrameworkCard>();
         private ModuleLoadReport _report;
@@ -32,6 +33,7 @@ namespace PCL.Shell
             InitializeComponent();
 
             _installer = new PackageInstaller(host.ModulesDirectory, host.Log);
+            _accessor = new ModuleHostAccessor(host);
             ListModules.ItemsSource = _cards;
             LabVersion.Text = "PCV " + host.Host.Version;
             RefreshModules();
@@ -44,24 +46,36 @@ namespace PCL.Shell
         private void RefreshModules()
         {
             _cards.Clear();
-            var installed = _installer.ListInstalled().ToDictionary(m => m.Id, m => m, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var entry in _report.Entries.OrderBy(e => e.Id, StringComparer.OrdinalIgnoreCase))
+            // 以"装了什么"为准列卡片：进程型框架不在 ModuleHost 的加载表里，只按加载结果列会漏掉它们
+            var running = _report.Entries.ToDictionary(e => e.Id, e => e, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var installed in _installer.ListInstalled())
             {
-                installed.TryGetValue(entry.Id, out var record);
+                running.TryGetValue(installed.Id, out var entry);
+                var manifest = ModuleHostAccessor.ReadManifest(installed.Directory);
+                var kind = manifest?.Kind ?? "assembly";
+                var isProcess = string.Equals(kind, "process", StringComparison.OrdinalIgnoreCase);
+
+                string state;
+                if (entry != null) state = StateText(entry.State);
+                else if (isProcess) state = _accessor.IsRunning(installed.Id) ? "运行中" : "未运行";
+                else state = "未加载";
+
                 _cards.Add(new FrameworkCard
                 {
-                    Id = entry.Id,
-                    Name = entry.Manifest?.DisplayName ?? record?.Name ?? entry.Id,
-                    Version = entry.Manifest?.Version ?? record?.Version ?? "?",
-                    State = StateText(entry.State),
-                    Detail = entry.Error ?? entry.Manifest?.Description ?? "自带",
-                    Initial = Initial(entry.Id),
-                    CanUninstall = !string.Equals(entry.Id, "pcl.core", StringComparison.OrdinalIgnoreCase)
+                    Id = installed.Id,
+                    Name = entry?.Manifest?.DisplayName ?? manifest?.DisplayName ?? installed.Name,
+                    Version = entry?.Manifest?.Version ?? manifest?.Version ?? installed.Version,
+                    State = state,
+                    Detail = entry?.Error ?? manifest?.Description ?? (isProcess ? "独立进程框架" : "自带"),
+                    Initial = Initial(installed.Id),
+                    CanUninstall = !string.Equals(installed.Id, "pcl.core", StringComparison.OrdinalIgnoreCase),
+                    Kind = isProcess ? "process" : "assembly"
                 });
             }
 
-            LabCount.Text = $"{_report.StartedCount} 个跑着 / 一共 {_report.Entries.Count} 个";
+            LabCount.Text = $"{_cards.Count(c => c.State == "已完成安装" || c.State == "运行中")} 个在跑 / 一共 {_cards.Count} 个";
             LabEmpty.Visibility = _cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             LabFooter.Text = "modules\\　·　logs\\modules.log";
         }
@@ -83,11 +97,11 @@ namespace PCL.Shell
         {
             switch (state)
             {
-                case ModuleState.Started: return "在跑";
-                case ModuleState.Loaded: return "已载入";
+                case ModuleState.Started: return "已完成安装";
+                case ModuleState.Loaded: return "已安装";
                 case ModuleState.Stopped: return "停了";
                 case ModuleState.Skipped: return "跳过";
-                case ModuleState.Failed: return "挂了";
+                case ModuleState.Failed: return "没装好";
                 default: return state.ToString();
             }
         }
@@ -118,6 +132,62 @@ namespace PCL.Shell
 
         private void BtnBack_Click(object sender, RoutedEventArgs e) => ShowHome();
 
+        /// <summary>给 App 的自动启动用：不带 owner，窗口就是独立窗口。</summary>
+        public void RunProcessFrameworkFor(ModuleManifest manifest, string directory)
+        {
+            _accessor.RunProcessFramework(manifest, directory, null);
+        }
+
+        /// <summary>
+        /// 打开一个框架。两种形态走两条路：
+        ///   · 进程型（py / node / exe）→ 起子进程，给它一个独立的深色窗口；
+        ///   · 程序集型（.NET DLL）→ 用宿主进程里的实例，弹 FrameworkWindow。
+        /// 命令行 --open 和界面上的按钮都从这里走，保证只有一套逻辑。
+        /// </summary>
+        public void OpenModuleById(string moduleId)
+        {
+            var directory = Path.Combine(_installer.ModulesDirectory, moduleId);
+            var manifest = ModuleHostAccessor.ReadManifest(directory);
+            var isProcess = string.Equals(manifest?.Kind, "process", StringComparison.OrdinalIgnoreCase);
+
+            if (isProcess)
+            {
+                try
+                {
+                    _accessor.RunProcessFramework(manifest, directory, this);
+                    SetStatus($"{manifest.DisplayName} 起来了，窗口是它自己的");
+                    RefreshModules();
+                }
+                catch (Exception ex)
+                {
+                    SetStatus("启动失败：" + ex.Message, true);
+                    _host.Log.Error($"启动 {moduleId} 失败", ex);
+                }
+                return;
+            }
+
+            var entry = _report.Entries.FirstOrDefault(m => string.Equals(m.Id, moduleId, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                SetStatus($"没有 {moduleId} 这个框架", true);
+                return;
+            }
+            if (entry.State != ModuleState.Started && entry.State != ModuleState.Loaded)
+            {
+                SetStatus($"{moduleId} 现在打不开：{entry.Error ?? StateText(entry.State)}", true);
+                return;
+            }
+
+            try
+            {
+                new FrameworkWindow(entry) { Owner = this, ShowInTaskbar = true }.Show();
+            }
+            catch (Exception ex)
+            {
+                SetStatus("打开失败：" + ex.Message, true);
+            }
+        }
+
         /// <summary>离屏渲染时直接切到第二页，省得为了截图去模拟点击。</summary>
         public void ShowAddViewForRender()
         {
@@ -140,6 +210,12 @@ namespace PCL.Shell
         }
 
         // ── 制作：复制提示词 + 打开 DeepSeek ────────────────────────────────
+
+        private void BtnPasteScript_Click(object sender, RoutedEventArgs e)
+        {
+            new ScriptWindow(_accessor) { Owner = this }.ShowDialog();
+            RefreshModules();
+        }
 
         private void BtnMake_Click(object sender, RoutedEventArgs e)
         {
@@ -313,6 +389,12 @@ namespace PCL.Shell
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
+        private void BtnOpenModule_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is FrameworkElement element) || !(element.Tag is string moduleId)) return;
+            OpenModuleById(moduleId);
+        }
+
         public sealed class FrameworkCard
         {
             public string Id { get; set; }
@@ -322,6 +404,7 @@ namespace PCL.Shell
             public string Detail { get; set; }
             public string Initial { get; set; }
             public bool CanUninstall { get; set; }
+            public string Kind { get; set; }
         }
     }
 }

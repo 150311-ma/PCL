@@ -12,10 +12,22 @@ namespace PCL.Shell
     public partial class App : Application
     {
         private ModuleHost _host;
+        private System.Windows.Forms.NotifyIcon _tray;
+        private MainWindow _window;
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // 崩了要留下证据，否则用户只看到"窗口一闪就没了"
+            DispatcherUnhandledException += (s, args) =>
+            {
+                LogCrash(args.Exception);
+                args.Handled = true;
+                MessageBox.Show("出了个意外：\n" + args.Exception.Message + "\n\n细节写进了 logs\\crash.log",
+                    "PAINCHARNWAV", MessageBoxButton.OK, MessageBoxImage.Warning);
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, args) => LogCrash(args.ExceptionObject as Exception);
 
             var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
@@ -98,7 +110,21 @@ namespace PCL.Shell
                 return;
             }
 
+            _window = window;
+
+            // 主窗口先建出来（隐藏着也有句柄），然后缩进托盘。
+            // 想直接看主界面就带 --show，调试和截图都靠它。
             window.Show();
+            SetupTray();
+
+            var showMain = Array.IndexOf(e.Args, "--show") >= 0;
+            if (!showMain) window.Hide();
+
+            AutoStartFrameworks(window);
+
+            var openIndex = Array.IndexOf(e.Args, "--open");
+            if (openIndex >= 0 && openIndex + 1 < e.Args.Length)
+                window.OpenModuleById(e.Args[openIndex + 1]);
         }
 
         private static void RenderToFile(Window window, string path, int width, int height)
@@ -122,8 +148,103 @@ namespace PCL.Shell
             using (var stream = File.Create(path)) encoder.Save(stream);
         }
 
+        /// <summary>
+        /// 托盘常驻：主窗口一启动就藏起来，只留图标；双击或点菜单才回到主界面。
+        /// "启动后自动隐藏""框架各自一个窗口"两件事都靠这里兜住，不然用户会以为软件没开。
+        /// </summary>
+        private static void LogCrash(Exception exception)
+        {
+            if (exception == null) return;
+            try
+            {
+                var folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+                Directory.CreateDirectory(folder);
+                File.AppendAllText(Path.Combine(folder, "crash.log"),
+                    $"==== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===={Environment.NewLine}{exception}{Environment.NewLine}");
+            }
+            catch
+            {
+                // 连日志都写不了就算了
+            }
+        }
+
+        private void SetupTray()
+        {
+            try
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(
+                    System.Reflection.Assembly.GetExecutingAssembly().Location);
+
+                var menu = new System.Windows.Forms.ContextMenuStrip();
+                menu.Items.Add("显示主界面", null, (s, e) => ShowMainWindow());
+                menu.Items.Add("退出", null, (s, e) => Shutdown());
+
+                _tray = new System.Windows.Forms.NotifyIcon
+                {
+                    Icon = icon,
+                    Text = "PAINCHARNWAV（PCV）",
+                    Visible = true,
+                    ContextMenuStrip = menu
+                };
+                _tray.DoubleClick += (s, e) => ShowMainWindow();
+                _tray.BalloonTipTitle = "PCV 在后台待着";
+                _tray.BalloonTipText = "双击托盘图标打开主界面；框架各自是独立窗口。";
+                _tray.ShowBalloonTip(3000);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("托盘图标创建失败：" + ex.Message);
+                // 托盘起不来就不能藏窗口，不然用户找不着程序
+                _window?.Show();
+            }
+        }
+
+        private void ShowMainWindow()
+        {
+            if (_window == null) return;
+            _window.Show();
+            if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
+            _window.Activate();
+        }
+
+        /// <summary>清单里写了 autoStart 的进程型框架，开机就拉起来，主窗口继续躲着。</summary>
+        private void AutoStartFrameworks(MainWindow window)
+        {
+            try
+            {
+                var modules = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modules");
+                if (!Directory.Exists(modules)) return;
+
+                foreach (var directory in Directory.GetDirectories(modules))
+                {
+                    var manifest = ModuleHostAccessor.ReadManifest(directory);
+                    if (manifest == null || !manifest.AutoStart) continue;
+                    if (!string.Equals(manifest.Kind, "process", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    try
+                    {
+                        window.RunProcessFrameworkFor(manifest, directory);
+                    }
+                    catch (Exception ex)
+                    {
+                        _host.Log.Error($"自动启动 {manifest.Id} 失败", ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _host.Log.Error("自动启动框架时出错", ex);
+            }
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
+            if (_tray != null)
+            {
+                _tray.Visible = false;
+                _tray.Dispose();
+                _tray = null;
+            }
             _host?.Dispose();
             base.OnExit(e);
         }

@@ -4,12 +4,14 @@
     <TargetFramework>net48</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>PCL.Shell</RootNamespace>
     <AssemblyName>PCV</AssemblyName>
     <Product>PAINCHARNWAV</Product>
     <AssemblyTitle>PAINCHARNWAV</AssemblyTitle>
     <Company>PAINCHARNWAV</Company>
     <ApplicationIcon>..\..\assets\pcv.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <ApplicationIcon />
@@ -19,6 +21,7 @@
     <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj" />
     <ProjectReference Include="..\PCL.Modular.Host\PCL.Modular.Host.csproj" />
     <ProjectReference Include="..\PCL.Modular.Packages\PCL.Modular.Packages.csproj" />
+    <ProjectReference Include="..\PCL.Modular.Runtime\PCL.Modular.Runtime.csproj" />
     <!-- 只保证先构建模块，不产生编译期引用：壳永远不直接 new 模块里的类型 -->
     <ProjectReference Include="..\PCL.Core\PCL.Core.vbproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\PCL.Theme\PCL.Theme.vbproj" ReferenceOutputAssembly="false" Private="false" />

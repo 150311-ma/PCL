@@ -13,7 +13,9 @@ import os
 import sys
 import zipfile
 
-ALLOWED = {".dll", ".json", ".txt", ".md", ".xaml", ".png", ".jpg", ".ico", ".xml"}
+ALLOWED = {".dll", ".json", ".txt", ".md", ".xaml", ".png", ".jpg", ".ico", ".xml",
+           ".py", ".js", ".mjs", ".ts", ".lua", ".rb", ".ps1", ".sh", ".cmd", ".bat",
+           ".exe", ".jar", ".node", ".html", ".css", ".csv", ".yml", ".yaml", ".toml"}
 
 
 def main(source, target):

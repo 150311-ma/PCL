@@ -166,12 +166,16 @@ namespace PCL.Modular.Packages
                     if (!IsValidModuleId(manifest.Id))
                         inspection.Errors.Add($"模块 Id 不合规（要求小写点分，如 pcl.demo）：{manifest.Id}");
 
-                    // 程序集必须在包内，且与嵌套目录一致
-                    if (!string.IsNullOrWhiteSpace(manifest.Assembly))
+                    // 入口文件必须在包内：程序集型看 assembly，进程型看 script
+                    var entryFile = string.Equals(manifest.Kind, "process", StringComparison.OrdinalIgnoreCase)
+                        ? manifest.Script
+                        : manifest.Assembly;
+
+                    if (!string.IsNullOrWhiteSpace(entryFile))
                     {
-                        var expected = (manifestPrefix + manifest.Assembly.Replace('\\', '/')).ToLowerInvariant();
+                        var expected = (manifestPrefix + entryFile.Replace('\\', '/')).ToLowerInvariant();
                         if (!inspection.Files.Any(f => f.ToLowerInvariant() == expected))
-                            inspection.Errors.Add($"清单声明了 {manifest.Assembly}，但压缩包内没有这个文件");
+                            inspection.Errors.Add($"清单声明了 {entryFile}，但压缩包内没有这个文件");
                     }
 
                     // 依赖必须已经装好

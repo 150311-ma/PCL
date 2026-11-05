@@ -13,8 +13,27 @@ namespace PCL.Modular.Abstractions
         public string Id { get; set; }
         public string Name { get; set; }
         public string Version { get; set; } = "1.0.0";
-        /// <summary>程序集文件名，相对于模块目录。</summary>
+        /// <summary>程序集文件名，相对于模块目录。进程型框架不用这个字段。</summary>
         public string Assembly { get; set; }
+
+        /// <summary>
+        /// 框架形态：
+        ///   "assembly"（默认）—— .NET 程序集，进程内加载；
+        ///   "process"          —— 独立的可执行进程，任何语言都行。
+        /// </summary>
+        public string Kind { get; set; } = "assembly";
+
+        /// <summary>进程型框架用什么跑：python / node / exec（直接执行 entry 指向的文件）。</summary>
+        public string Runtime { get; set; }
+
+        /// <summary>进程型框架的入口文件（相对模块目录），比如 main.py。</summary>
+        public string Script { get; set; }
+
+        /// <summary>启动参数模板，空格分隔；支持 {dir} 占位。</summary>
+        public string Arguments { get; set; }
+
+        /// <summary>宿主启动时自动拉起（配合"启动后隐藏主窗口"用）。</summary>
+        public bool AutoStart { get; set; }
         /// <summary>入口类型的全名；留空则自动取程序集中第一个 IPclModule 实现。</summary>
         public string Entry { get; set; }
         /// <summary>依赖的模块 Id。</summary>
@@ -42,7 +61,15 @@ namespace PCL.Modular.Abstractions
             var errors = new List<string>();
             if (string.IsNullOrWhiteSpace(Id)) errors.Add("缺少 id");
             else if (Id.Count(c => c == '.') == 0) errors.Add($"id 建议使用点分命名：{Id}");
-            if (string.IsNullOrWhiteSpace(Assembly)) errors.Add("缺少 assembly");
+            if (Kind == "process")
+            {
+                if (string.IsNullOrWhiteSpace(Script)) errors.Add("进程型框架缺少 script（入口文件）");
+                if (string.IsNullOrWhiteSpace(Runtime)) errors.Add("进程型框架缺少 runtime（python / node / exec）");
+            }
+            else if (string.IsNullOrWhiteSpace(Assembly))
+            {
+                errors.Add("缺少 assembly");
+            }
             if (Dependencies != null && Dependencies.Contains(Id)) errors.Add("模块不能依赖自身");
             if (Dependencies != null && Dependencies.Distinct().Count() != Dependencies.Count)
                 errors.Add("dependencies 中存在重复项");
