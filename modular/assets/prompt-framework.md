@@ -55,6 +55,43 @@ zip 里就是这个形状，不要多套一层，不要带 pdb、obj、bin。
 - 需要配置就通过 `context.Services` 取 `PCL.Modular.Contracts.ISettingsService`，不要自己读写文件。
 - 不要碰宿主内部类型，不要反射，不要联网下载可执行文件，不要起后台常驻线程（真要起就在 OnStop 里停掉）。
 
+## 先选分类：框架还是软件（必填）
+
+`module.json` 里必须写 `category`，只有两个取值：
+
+| category | 是什么 | 硬性条件 |
+| --- | --- | --- |
+| `framework` | 框架，提供能力 | 必须有界面 |
+| `software` | 软件，调用框架干活 | 必须有界面、必须依赖至少一个框架、自身不含任何框架 |
+
+补充两条：
+
+- 如果这是**某个软件的基础框架**，写 `"baseFor": "PCV"`（值是那个软件的名字）。
+  基础框架在界面上不提供"打开使用"，它是被用的一方。
+- 软件包被安装时，宿主会检查 `dependencies` 是否为空 —— 空的一律拒装（"软件必须依赖至少一个框架"）。
+
+## 界面是硬要求
+
+- **进程型**（`kind: "process"`）：宿主会给你一个窗口显示 stdout、把输入送进 stdin，
+  这就是界面。但别只 print 一行就退出 —— 那样用户看到一个空窗口。
+- **程序集型**（`kind: "assembly"`）：必须实现 `PCL.Modular.Contracts.IFrameworkSurface`，
+  否则宿主会在界面上标"没有提供界面（不符合分类要求）"。
+
+```csharp
+public sealed class Entry : IPclModule, IFrameworkSurface
+{
+    public string Title => "我的框架";
+
+    public object CreateView(IModuleContext context)
+    {
+        // 返回一个 System.Windows.FrameworkElement（契约不引 WPF，所以签名是 object）
+        var panel = new System.Windows.Controls.StackPanel();
+        panel.Children.Add(new System.Windows.Controls.TextBlock { Text = "这里是我自己的界面" });
+        return panel;
+    }
+}
+```
+
 ## 契约里真实存在的成员（照抄，不要猜）
 
 宿主只提供这些，写错就是 `CS1061`，编译直接失败：

@@ -1,4 +1,5 @@
 Imports PCL.Modular.Abstractions
+Imports PCL.Modular.Contracts
 
 Namespace Global.PCL.Demo.Hello
 
@@ -6,8 +7,8 @@ Namespace Global.PCL.Demo.Hello
     ''' 示例功能框架：用来验证"拖进来就能用"这套流程真的通。
     ''' 它本身不做什么大事，只在日志里报到，并把自己登记成一个服务。
     ''' </summary>
-    Public Class HelloModule
-        Implements IPclModule
+    Public Partial Class HelloModule
+        Implements IPclModule, IFrameworkSurface
 
         Private _log As ILogger
         Private _ticks As Integer

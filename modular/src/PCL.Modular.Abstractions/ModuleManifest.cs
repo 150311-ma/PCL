@@ -34,6 +34,22 @@ namespace PCL.Modular.Abstractions
 
         /// <summary>宿主启动时自动拉起（配合"启动后隐藏主窗口"用）。</summary>
         public bool AutoStart { get; set; }
+
+        /// <summary>
+        /// 分类，只有两种：
+        ///   "framework"（默认）—— 框架，提供能力；
+        ///   "software"        —— 软件，调用框架干活，自己不含框架。
+        /// </summary>
+        public string Category { get; set; } = "framework";
+
+        /// <summary>
+        /// 非空表示"这是某个软件的基础框架"，值是那个软件的名字，比如 "PCV"。
+        /// 基础框架不提供"打开使用"，它是被用的一方。
+        /// </summary>
+        public string BaseFor { get; set; }
+
+        public bool IsSoftware => string.Equals(Category, "software", StringComparison.OrdinalIgnoreCase);
+        public bool IsBaseFramework => !string.IsNullOrWhiteSpace(BaseFor);
         /// <summary>入口类型的全名；留空则自动取程序集中第一个 IPclModule 实现。</summary>
         public string Entry { get; set; }
         /// <summary>依赖的模块 Id。</summary>
@@ -75,6 +91,22 @@ namespace PCL.Modular.Abstractions
                 errors.Add("dependencies 中存在重复项");
             if (!string.IsNullOrWhiteSpace(MinHostVersion) && !IsVersionAtLeast(HostInfoVersion, MinHostVersion))
                 errors.Add($"需要宿主版本 >= {MinHostVersion}，当前 {HostInfoVersion}");
+
+            if (!string.Equals(Category, "framework", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(Category, "software", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"category 只能是 framework 或 software，现在是 {Category}");
+            }
+
+            if (IsSoftware)
+            {
+                // 软件的三个硬性条件里，能静态查的就这两条
+                if (Dependencies == null || Dependencies.Count == 0)
+                    errors.Add("软件必须依赖至少一个框架（它自己不含框架，能力要向框架要）");
+                if (IsBaseFramework)
+                    errors.Add("软件不能声明自己是基础框架（baseFor 只属于框架）");
+            }
+
             return errors;
         }
 

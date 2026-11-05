@@ -23,7 +23,8 @@ namespace PCL.Shell
         private readonly ModuleHost _host;
         private readonly ModuleHostAccessor _accessor;
         private readonly PackageInstaller _installer;
-        private readonly ObservableCollection<FrameworkCard> _cards = new ObservableCollection<FrameworkCard>();
+        private readonly ObservableCollection<FrameworkCard> _frameworks = new ObservableCollection<FrameworkCard>();
+        private readonly ObservableCollection<FrameworkCard> _software = new ObservableCollection<FrameworkCard>();
         private ModuleLoadReport _report;
 
         public MainWindow(ModuleHost host, ModuleLoadReport report)
@@ -34,7 +35,8 @@ namespace PCL.Shell
 
             _installer = new PackageInstaller(host.ModulesDirectory, host.Log);
             _accessor = new ModuleHostAccessor(host);
-            ListModules.ItemsSource = _cards;
+            ListFrameworks.ItemsSource = _frameworks;
+            ListSoftware.ItemsSource = _software;
             LabVersion.Text = "PCV " + host.Host.Version;
             RefreshModules();
 
@@ -45,40 +47,56 @@ namespace PCL.Shell
 
         private void RefreshModules()
         {
-            _cards.Clear();
+            _frameworks.Clear();
+            _software.Clear();
 
-            // 以"装了什么"为准列卡片：进程型框架不在 ModuleHost 的加载表里，只按加载结果列会漏掉它们
-            var running = _report.Entries.ToDictionary(e => e.Id, e => e, StringComparer.OrdinalIgnoreCase);
+            var loaded = _report.Entries.ToDictionary(e => e.Id, e => e, StringComparer.OrdinalIgnoreCase);
 
             foreach (var installed in _installer.ListInstalled())
             {
-                running.TryGetValue(installed.Id, out var entry);
+                loaded.TryGetValue(installed.Id, out var entry);
                 var manifest = ModuleHostAccessor.ReadManifest(installed.Directory);
-                var kind = manifest?.Kind ?? "assembly";
-                var isProcess = string.Equals(kind, "process", StringComparison.OrdinalIgnoreCase);
+                var isProcess = string.Equals(manifest?.Kind, "process", StringComparison.OrdinalIgnoreCase);
+                var isSoftware = manifest != null && manifest.IsSoftware;
+                var isBase = manifest != null && manifest.IsBaseFramework;
 
                 string state;
                 if (entry != null) state = StateText(entry.State);
                 else if (isProcess) state = _accessor.IsRunning(installed.Id) ? "运行中" : "未运行";
                 else state = "未加载";
 
-                _cards.Add(new FrameworkCard
+                var detail = entry?.Error ?? manifest?.Description ?? (isProcess ? "独立进程框架" : "自带");
+
+                // "必须要有界面"：程序集型框架没实现 IFrameworkSurface 就是没有界面，
+                // 这里如实标出来，而不是给个点不开的按钮
+                var hasSurface = entry?.Instance is PCL.Modular.Contracts.IFrameworkSurface;
+                var noSurface = entry != null && !isProcess && !hasSurface && isBase == false && isSoftware == false;
+
+                _cardsTarget(isSoftware).Add(new FrameworkCard
                 {
                     Id = installed.Id,
                     Name = entry?.Manifest?.DisplayName ?? manifest?.DisplayName ?? installed.Name,
                     Version = entry?.Manifest?.Version ?? manifest?.Version ?? installed.Version,
                     State = state,
-                    Detail = entry?.Error ?? manifest?.Description ?? (isProcess ? "独立进程框架" : "自带"),
+                    Detail = noSurface ? "⚠ 没有提供界面（不符合分类要求）· " + detail : detail,
                     Initial = Initial(installed.Id),
                     CanUninstall = !string.Equals(installed.Id, "pcl.core", StringComparison.OrdinalIgnoreCase),
-                    Kind = isProcess ? "process" : "assembly"
+                    CanOpen = !isBase,
+                    IsBase = isBase,
+                    BaseLabel = isBase ? (manifest.BaseFor + " 的基础框架") : "",
+                    Category = isSoftware ? "software" : "framework"
                 });
             }
 
-            LabCount.Text = $"{_cards.Count(c => c.State == "已完成安装" || c.State == "运行中")} 个在跑 / 一共 {_cards.Count} 个";
-            LabEmpty.Visibility = _cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            LabFrameworkCount.Text = _frameworks.Count + " 个";
+            LabSoftwareCount.Text = _software.Count + " 个";
+            LabNoFramework.Visibility = _frameworks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            LabNoSoftware.Visibility = _software.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             LabFooter.Text = "modules\\　·　logs\\modules.log";
         }
+
+        private ObservableCollection<FrameworkCard> _cardsTarget(bool isSoftware)
+            => isSoftware ? _software : _frameworks;
 
         /// <summary>
         /// 两个字母的缩写：pcl.core → Co，pcv.cleaner → Cl。
@@ -443,6 +461,11 @@ namespace PCL.Shell
             public string Initial { get; set; }
             public bool CanUninstall { get; set; }
             public string Kind { get; set; }
+            public bool CanOpen { get; set; } = true;
+            public bool IsBase { get; set; }
+            public string BaseLabel { get; set; } = "";
+            public string Category { get; set; } = "framework";
+            public Visibility BaseVisibility => IsBase ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

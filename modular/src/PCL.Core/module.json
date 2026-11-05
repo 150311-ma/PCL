@@ -8,5 +8,10 @@
   "loadPriority": 0,
   "author": "150311-ma",
   "description": "基础功能层：路径约定、配置持久化、颜色运算（MyColor）。对应上游 Modules/Base 中可独立编译的部分。",
-  "tags": [ "core", "base" ]
+  "tags": [
+    "core",
+    "base"
+  ],
+  "category": "framework",
+  "baseFor": "PCV"
 }

@@ -12,5 +12,6 @@
   "description": "清掉过期的 .backup / .trash 和两周前的日志，每删一项都写进日志。",
   "tags": [
     "维护"
-  ]
+  ],
+  "category": "framework"
 }

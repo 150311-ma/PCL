@@ -9,5 +9,9 @@
   "loadPriority": 200,
   "author": "150311-ma",
   "description": "一个只用标准库的 Python 框架，用来证明任何语言都能写框架包。",
-  "tags": [ "示例", "python" ]
+  "tags": [
+    "示例",
+    "python"
+  ],
+  "category": "framework"
 }

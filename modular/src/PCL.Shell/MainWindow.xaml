@@ -122,6 +122,100 @@
             <Setter Property="Width" Value="24" />
             <Setter Property="Height" Value="24" />
         </Style>
+
+        <!-- 列表卡片：框架和软件共用一套，靠数据决定显示什么 -->
+        <DataTemplate x:Key="FrameworkCardTemplate">
+            <Border Style="{StaticResource GlassCard}" CornerRadius="18" Padding="16,14" Margin="0,0,0,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 只有"用得上"的东西才给打开按钮；基础框架是被用的，不给 -->
+                    <Button Content="打开使用它" Tag="{Binding Id}" Click="BtnOpenModule_Click"
+                            Height="30" Padding="13,0" FontSize="11.5" VerticalAlignment="Center"
+                            Cursor="Hand" BorderThickness="1" Margin="0,0,14,0">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
+                                <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush6}" />
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Shell" Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="15">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="{TemplateBinding Padding}" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Shell" Property="Background"
+                                                            Value="{DynamicResource ColorBrush6}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanOpen}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <Border Grid.Column="1" Width="40" Height="40" CornerRadius="13" Background="{DynamicResource ColorBrush6}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Initial}" FontSize="13" FontWeight="Bold"
+                                   Foreground="{DynamicResource ColorBrush2}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <StackPanel Grid.Column="2" Margin="14,0,12,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ColorBrush1}" />
+                            <TextBlock Text="{Binding Version}" FontSize="11.5" Margin="8,2,0,0"
+                                       Foreground="#8A94A3" />
+                            <Border Background="#1A00C853" CornerRadius="6" Padding="6,1" Margin="8,0,0,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding State}" FontSize="10.5" Foreground="#1B8A4B" />
+                            </Border>
+                            <!-- 基础框架必须写清是谁的基础框架 -->
+                            <Border Background="#22FF8A00" CornerRadius="6" Padding="6,1" Margin="6,0,0,0"
+                                    VerticalAlignment="Center" Visibility="{Binding BaseVisibility}">
+                                <TextBlock Text="{Binding BaseLabel}" FontSize="10.5" Foreground="#9A5B00" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Detail}" FontSize="11.5" Foreground="#7C8798"
+                                   Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <Button Grid.Column="3" Content="卸载" Tag="{Binding Id}"
+                            Click="BtnUninstall_Click" Height="28"
+                            Padding="12,0" FontSize="11.5" VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanUninstall}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -227,101 +321,33 @@
                         </StackPanel>
                     </Grid>
 
-                    <Grid Margin="2,30,0,10">
-                        <TextBlock Text="已经装了的" FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource ColorBrush1}" />
-                        <TextBlock x:Name="LabCount" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    <Grid Margin="2,30,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="框架" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ColorBrush1}" />
+                            <TextBlock Text="提供能力，可以被软件调用" FontSize="11.5" Margin="10,3,0,0"
+                                       Foreground="#9AA4B2" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabFrameworkCount" HorizontalAlignment="Right" VerticalAlignment="Center"
                                    FontSize="12" Foreground="#7C8798" Text="0 个" />
                     </Grid>
+                    <ItemsControl x:Name="ListFrameworks" ItemTemplate="{StaticResource FrameworkCardTemplate}" />
+                    <TextBlock x:Name="LabNoFramework" Text="还没有框架。先从桌面那份 .pclpkg 装一个。"
+                               FontSize="12" Foreground="#8A94A3" Margin="4,2,0,0" Visibility="Collapsed" />
 
-                    <ItemsControl x:Name="ListModules">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource GlassCard}" CornerRadius="18" Padding="16,14" Margin="0,0,0,10">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- 主要的动作放左边：先能打开用，再谈卸载 -->
-                                        <Button Content="打开使用它" Tag="{Binding Id}" Click="BtnOpenModule_Click"
-                                                Height="30" Padding="13,0" FontSize="11.5" VerticalAlignment="Center"
-                                                Cursor="Hand" BorderThickness="1" Margin="0,0,14,0">
-                                            <Button.Style>
-                                                <Style TargetType="Button">
-                                                    <Setter Property="Foreground" Value="{DynamicResource ColorBrush2}" />
-                                                    <Setter Property="Background" Value="{DynamicResource ColorBrush7}" />
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource ColorBrush6}" />
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate TargetType="Button">
-                                                                <Border x:Name="Shell" Background="{TemplateBinding Background}"
-                                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                                                        CornerRadius="15">
-                                                                    <ContentPresenter HorizontalAlignment="Center"
-                                                                                      VerticalAlignment="Center"
-                                                                                      Margin="{TemplateBinding Padding}" />
-                                                                </Border>
-                                                                <ControlTemplate.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter TargetName="Shell" Property="Background"
-                                                                                Value="{DynamicResource ColorBrush6}" />
-                                                                    </Trigger>
-                                                                </ControlTemplate.Triggers>
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-
-                                        <Border Grid.Column="1" Width="40" Height="40" CornerRadius="13" Background="{DynamicResource ColorBrush6}"
-                                                VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Initial}" FontSize="13" FontWeight="Bold"
-                                                       Foreground="{DynamicResource ColorBrush2}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-
-                                        <StackPanel Grid.Column="2" Margin="14,0,12,0" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource ColorBrush1}" />
-                                                <TextBlock Text="{Binding Version}" FontSize="11.5" Margin="8,2,0,0"
-                                                           Foreground="#8A94A3" />
-                                                <Border Background="#1A00C853" CornerRadius="6" Padding="6,1" Margin="8,0,0,0"
-                                                        VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding State}" FontSize="10.5" Foreground="#1B8A4B" />
-                                                </Border>
-                                            </StackPanel>
-                                            <TextBlock Text="{Binding Detail}" FontSize="11.5" Foreground="#7C8798"
-                                                       Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-
-                                        <Button Grid.Column="3" Content="卸载" Tag="{Binding Id}"
-                                                Click="BtnUninstall_Click" Height="28"
-                                                Padding="12,0" FontSize="11.5" VerticalAlignment="Center">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding CanUninstall}" Value="False">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <TextBlock x:Name="LabEmpty" Text="空的。pcl.core 是自带的，不用管。"
-                               FontSize="12" Foreground="#8A94A3" Margin="4,4,0,0" Visibility="Collapsed" />
+                    <Grid Margin="2,22,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="软件" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ColorBrush1}" />
+                            <TextBlock Text="调用框架干活，自身不含框架" FontSize="11.5" Margin="10,3,0,0"
+                                       Foreground="#9AA4B2" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabSoftwareCount" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="12" Foreground="#7C8798" Text="0 个" />
+                    </Grid>
+                    <ItemsControl x:Name="ListSoftware" ItemTemplate="{StaticResource FrameworkCardTemplate}" />
+                    <TextBlock x:Name="LabNoSoftware" Text="还没有软件。"
+                               FontSize="12" Foreground="#8A94A3" Margin="4,2,0,0" Visibility="Collapsed" />
                 </StackPanel>
             </ScrollViewer>
 

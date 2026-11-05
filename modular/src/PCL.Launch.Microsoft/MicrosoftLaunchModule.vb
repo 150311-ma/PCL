@@ -8,8 +8,8 @@ Namespace Global.PCL.Launch.Microsoft
     ''' 只负责把 IMicrosoftAuthService 挂到服务表上；启动游戏属于后续的 Launch 模块，
     ''' 这里刻意不做“登录完顺便启动”，避免又把模块边界糊在一起。
     ''' </summary>
-    Public Class MicrosoftLaunchModule
-        Implements IPclModule
+    Public Partial Class MicrosoftLaunchModule
+        Implements IPclModule, IFrameworkSurface
 
         Private _log As ILogger
         Private _service As MsAuthService

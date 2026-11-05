@@ -6,8 +6,8 @@ Namespace Global.PCL.Theme
     ''' <summary>
     ''' 主题模块入口。依赖 pcl.core 提供的配置服务（没有也能跑，只是不记忆选择）。
     ''' </summary>
-    Public Class ThemeModule
-        Implements IPclModule
+    Public Partial Class ThemeModule
+        Implements IPclModule, IFrameworkSurface
 
         Private _log As ILogger
         Private _service As ThemeService

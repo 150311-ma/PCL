@@ -12,5 +12,6 @@
   "description": "记打开次数、起始日期、累计时长。只存在本地配置里，不联网。",
   "tags": [
     "统计"
-  ]
+  ],
+  "category": "framework"
 }

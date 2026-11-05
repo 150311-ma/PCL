@@ -5,6 +5,7 @@
     <RootNamespace>PCL.Demo.Hello</RootNamespace>
     <AssemblyName>PCL.Demo.Hello</AssemblyName>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <UseWPF>true</UseWPF>
     <OptionExplicit>On</OptionExplicit>
     <OptionInfer>On</OptionInfer>
   </PropertyGroup>
