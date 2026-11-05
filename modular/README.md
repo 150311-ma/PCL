@@ -408,3 +408,52 @@ PCV.exe --build "某个构建脚本.py"
 VB 项目默认只收 `**/*.vb`，`.cs` 文件被无声忽略，于是 dll 里没有 `IFrameworkSurface`，
 界面上一直显示"没有提供界面"。改成 VB 重写才对。判断办法很土：直接在 dll 字节里找
 `IFrameworkSurface` 字符串，找不到就是没编进去。
+
+## 十五、这轮改的四件事（2026-11-05 追加）
+
+### 1. 软件在前，框架收起
+
+首页顺序改成「软件」在上、「框架」在下，框架默认**收起**（`▸ 框架（9 个）`，点一下展开）。
+理由很直接：用户是来用软件的，框架是给软件撑腰的，不该先占一屏。
+
+### 2. 打开软件，自动拉起它调用的框架
+
+软件是"调用框架干活"的，那它依赖的框架得先活着。打开软件时按 `dependencies` 依次检查，
+进程型的没在跑就**不开窗口地**启动它；已经在跑的不重复启动（两个软件共用一个框架不会打两份）。
+
+实测日志：
+
+```
+[host] pcv.py.demo 进程已启动（...python.exe）
+[host] 随 pcv.app.demo 自动启动框架 pcv.py.demo（不开窗口）
+[host] pcv.app.demo 进程已启动
+```
+
+### 3. 控制台乱码
+
+根因不是"编码没设对"，是**读的一方硬按 UTF-8 解**：Java 在中文 Windows 上输出 GBK，
+而 `BeginOutputReadLine` 用 `StandardOutputEncoding`（UTF-8）硬解，中文就成了 `ʵ�ù���`。
+
+改成自己读字节、按行切，解码时 **UTF-8 严格优先、失败退回系统编码（GBK）**。
+验证办法：造一个往 stderr 写 GBK 字节的假框架，宿主日志里应显示
+`[stderr] 中文测试：龙猫启动器 你好 世界`——实测通过。
+
+### 4. 多设备兼容
+
+- **Java 按版本挑**：扫描 `JAVA_HOME`、`PATH`、`Program Files\Java`、`Eclipse Adoptium`、`Zulu`、
+  `Microsoft`、`LOCALAPPDATA\Programs`、`/usr/lib/jvm`、`/Library/Java/...`，
+  先找主版本刚好等于 `javaVersion.majorVersion` 的，没有再找最小的"够新"的。
+  这台机器只有 JDK 25，所以跑 1.20.1 会明确提醒"官方要 17，你现在 25，崩了先换"。
+- **natives 按平台**：`natives-windows` / `-arm64` / `-x86` 按当前 OS+arch 选，classpath 只留匹配的那份。
+- **路径不写死**：全部相对 `PWD` / 数据目录，换机器不用改代码。
+
+### 5. 宣传片
+
+`tools/make_promo.py` 用 ffmpeg 把**真实界面截图**拼成 27 秒的片子
+（开场标题 → 首页 → 展开框架 → 加包页 → 软件窗口 → 结尾），
+每段缓慢推近 + 底部字幕，段间 xfade 过渡。素材全是 `--render` 离屏渲染或真实窗口截图，
+没有一张是画的。
+
+```bat
+python tools/make_promo.py     :: 产出 promo\PCV-宣传片.mp4
+```

@@ -21,12 +21,12 @@ def control(payload):
 
 
 say("PCV 示例软件（不是框架，注意区别）")
-say("我自己什么都不算——数据是向框架要的。")
+say("我自己什么都不算——能力是向框架要的。")
 say("")
-say("正在调用框架 pcv.stat …")
+say("正在调用框架 pcv.py.demo …")
 
 # 这就是"调用框架"：宿主只做转发，我不知道对方跑在哪、也不知道它内部怎么实现
-control({"type": "call", "target": "pcv.stat", "text": "把使用次数报一下"})
+control({"type": "call", "target": "pcv.py.demo", "text": "你好，我是示例软件"})
 say("已经发出请求，回执会出现在下面。")
 say("")
 say("输入任意内容会原样回显；输入 exit 退出。")

@@ -6,9 +6,14 @@
   "runtime": "python",
   "script": "main.py",
   "category": "software",
-  "dependencies": [ "pcl.core" ],
+  "dependencies": [
+    "pcl.core",
+    "pcv.py.demo"
+  ],
   "loadPriority": 300,
   "author": "150311-ma",
-  "description": "演示「软件」的三条：有界面、调用框架、自身不含框架。启动后会向 pcv.stat 要数据。",
-  "tags": [ "示例" ]
+  "description": "演示「软件」的三条：有界面、调用框架、自身不含框架。打开时会自动拉起 pcv.py.demo 并向它说话。",
+  "tags": [
+    "示例"
+  ]
 }

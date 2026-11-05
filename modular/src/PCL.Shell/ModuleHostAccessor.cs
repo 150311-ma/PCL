@@ -51,6 +51,37 @@ namespace PCL.Shell
 
         public bool IsRunning(string moduleId) => FrameworkRegistry.Find(moduleId) != null;
 
+        /// <summary>
+        /// 把某个包依赖里"还没跑起来的进程型框架"启动起来（不开窗口，纯后台）。
+        /// 已经在跑的不重复启动 —— 两个软件共用一个框架时不会打出两份。
+        /// </summary>
+        public void StartDependencies(ModuleManifest manifest)
+        {
+            foreach (var dependencyId in manifest.Dependencies ?? new System.Collections.Generic.List<string>())
+            {
+                if (FrameworkRegistry.Find(dependencyId) != null) continue;
+
+                var directory = Path.Combine(ModulesDirectory, dependencyId);
+                var dependency = ReadManifest(directory);
+                if (dependency == null) continue;
+                if (!string.Equals(dependency.Kind, "process", StringComparison.OrdinalIgnoreCase)) continue;
+
+                try
+                {
+                    var dataDirectory = Path.Combine(BaseDirectory, "PCLData", "frameworks", dependencyId);
+                    Directory.CreateDirectory(dataDirectory);
+
+                    var framework = new ProcessFramework(dependency, Log, dataDirectory);
+                    framework.Start();
+                    Log.Info($"随 {manifest.Id} 自动启动框架 {dependencyId}（不开窗口）");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"自动启动依赖 {dependencyId} 失败", ex);
+                }
+            }
+        }
+
         /// <summary>启动一个进程型框架并给它一个窗口；已经在跑就把窗口拉到前面。</summary>
         public void RunProcessFramework(ModuleManifest manifest, string directory, Window owner)
         {
@@ -61,6 +92,10 @@ namespace PCL.Shell
                 existing.Activate();
                 return;
             }
+
+            // 软件是"调用框架干活"的，那它依赖的框架得先活着。
+            // 这里只拉进程型依赖：程序集型框架早被 ModuleHost 加载过了。
+            StartDependencies(manifest);
 
             var dataDirectory = Path.Combine(BaseDirectory, "PCLData", "frameworks", manifest.Id);
             Directory.CreateDirectory(dataDirectory);

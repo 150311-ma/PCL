@@ -113,6 +113,9 @@ namespace PCL.Shell
             if (viewIndex >= 0 && viewIndex + 1 < e.Args.Length && e.Args[viewIndex + 1] == "add")
                 window.ShowAddViewForRender();
 
+            if (Array.IndexOf(e.Args, "--expand") >= 0)
+                window.ExpandFrameworksForRender();
+
             // 离屏渲染：给自动化验证用，不弹窗、不需要人盯着，也能确认界面真的画出来了
             var renderIndex = Array.IndexOf(e.Args, "--render");
             if (renderIndex >= 0)

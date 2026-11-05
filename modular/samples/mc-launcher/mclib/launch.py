@@ -7,27 +7,83 @@ import subprocess
 import meta
 
 
-def find_java(preferred=None):
-    candidates = []
-    if preferred:
-        candidates.append(preferred)
+def _candidate_javas():
+    """把这台机器上能找到的 java.exe 都收进来，供按版本挑。"""
+    found = []
 
     home = os.environ.get("JAVA_HOME")
     if home:
-        candidates.append(os.path.join(home, "bin", "java.exe" if os.name == "nt" else "java"))
+        found.append(os.path.join(home, "bin", "java.exe" if os.name == "nt" else "java"))
 
     path = os.environ.get("PATH", "")
     for folder in path.split(";" if os.name == "nt" else ":"):
-        if not folder.strip():
-            continue
-        candidate = os.path.join(folder.strip('"'), "java.exe" if os.name == "nt" else "java")
-        if os.path.isfile(candidate):
-            candidates.append(candidate)
+        if folder.strip():
+            found.append(os.path.join(folder.strip('"'), "java.exe" if os.name == "nt" else "java"))
 
-    for candidate in candidates:
-        if candidate and os.path.isfile(candidate):
-            return candidate
-    return None
+    # 常见安装位置：换台机器也不用改代码
+    roots = [
+        r"C://Program Files//Java",
+        r"C://Program Files//Eclipse Adoptium",
+        r"C://Program Files//Zulu",
+        r"C://Program Files//Microsoft",
+        r"C://Program Files (x86)//Java",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Eclipse Adoptium"),
+        "/usr/lib/jvm",
+        "/Library/Java/JavaVirtualMachines",
+    ]
+    for root in roots:
+        if not root or not os.path.isdir(root):
+            continue
+        try:
+            for name in os.listdir(root):
+                home_dir = os.path.join(root, name)
+                if not os.path.isdir(home_dir):
+                    continue
+                found.append(os.path.join(home_dir, "bin", "java.exe" if os.name == "nt" else "java"))
+                found.append(os.path.join(home_dir, "Contents", "Home", "bin", "java"))
+        except OSError:
+            pass
+
+    seen = set()
+    result = []
+    for candidate in found:
+        key = candidate.lower()
+        if key in seen or not os.path.isfile(candidate):
+            continue
+        seen.add(key)
+        result.append(candidate)
+    return result
+
+
+def find_java(preferred=None, required=None):
+    """挑 Java。
+
+    有指定就用指定的；否则在机器上所有 JDK 里挑：先找主版本刚好等于 required 的，
+    没有再找最小的"够新"的，最后退而求其次用最新的。
+    这样一台机器装了好几个 JDK 也不会挑错 —— 换台机器同理。
+    """
+    if preferred and os.path.isfile(preferred):
+        return preferred
+
+    candidates = _candidate_javas()
+    if not candidates:
+        return None
+
+    if required:
+        scanned = [(find_one_major(candidate), candidate) for candidate in candidates]
+        exact = [item for item in scanned if item[0] == required]
+        if exact:
+            return exact[0][1]
+        newer = sorted([item for item in scanned if item[0] >= required], key=lambda item: item[0])
+        if newer:
+            return newer[0][1]
+        return max(scanned, key=lambda item: item[0])[1]
+
+    return candidates[0]
+
+
+def find_one_major(java_path):
+    return java_major(java_path)
 
 
 def java_major(java_path):

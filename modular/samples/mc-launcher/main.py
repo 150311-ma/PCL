@@ -196,12 +196,11 @@ def cmd_run(state, args):
     with open(version_file, encoding="utf-8") as handle:
         version_json = json.load(handle)
 
-    java = launch.find_java(state.get("java") or None)
+    need = (version_json.get("javaVersion") or {}).get("majorVersion", 8)
+    java = launch.find_java(state.get("java") or None, need)
     if not java:
         say("找不到 Java，启动不了。装个 JDK 或者 `java <路径>`。")
         return
-
-    need = (version_json.get("javaVersion") or {}).get("majorVersion", 8)
     have = launch.java_major(java)
     if have and have < need:
         say("这个版本要 Java %d，现在是 %d —— 高版本游戏用 Java 8 是起不来的。" % (need, have))

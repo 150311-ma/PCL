@@ -88,11 +88,18 @@ namespace PCL.Shell
                 });
             }
 
-            LabFrameworkCount.Text = _frameworks.Count + " 个";
+            LabFrameworkTitle.Text = $"框架（{_frameworks.Count} 个）";
             LabSoftwareCount.Text = _software.Count + " 个";
             LabNoFramework.Visibility = _frameworks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             LabNoSoftware.Visibility = _software.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             LabFooter.Text = "modules\\　·　logs\\modules.log";
+        }
+
+        private void BtnToggleFrameworks_Click(object sender, RoutedEventArgs e)
+        {
+            var expand = PanFrameworks.Visibility != Visibility.Visible;
+            PanFrameworks.Visibility = expand ? Visibility.Visible : Visibility.Collapsed;
+            LabFrameworkArrow.Text = expand ? "▾" : "▸";
         }
 
         private ObservableCollection<FrameworkCard> _cardsTarget(bool isSoftware)
@@ -204,6 +211,13 @@ namespace PCL.Shell
             {
                 SetStatus("打开失败：" + ex.Message, true);
             }
+        }
+
+        /// <summary>渲染"展开框架"那一帧用。</summary>
+        public void ExpandFrameworksForRender()
+        {
+            PanFrameworks.Visibility = Visibility.Visible;
+            LabFrameworkArrow.Text = "▾";
         }
 
         /// <summary>离屏渲染时直接切到第二页，省得为了截图去模拟点击。</summary>

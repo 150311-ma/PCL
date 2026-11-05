@@ -93,8 +93,13 @@ namespace PCL.Modular.Runtime
             if (!_process.Start())
                 throw new InvalidOperationException("进程没有启动起来");
 
-            _process.BeginOutputReadLine();
-            _process.BeginErrorReadLine();
+            // 不用 BeginOutputReadLine：它按 StandardOutputEncoding（UTF-8）硬解，
+            // 而 Java 在中文 Windows 上是按 GBK 吐的，直接解就是一片乱码。
+            // 自己读字节，先试 UTF-8，失败再退系统编码。
+            var outThread = new System.Threading.Thread(() => Pump(_process.StandardOutput.BaseStream, false)) { IsBackground = true };
+            var errThread = new System.Threading.Thread(() => Pump(_process.StandardError.BaseStream, true)) { IsBackground = true };
+            outThread.Start();
+            errThread.Start();
 
             // 给它套一根回收绳：宿主死了它跟着死，内存 1 GB、进程树最多 8 个
             _job = new FrameworkJob();
@@ -163,6 +168,60 @@ namespace PCL.Modular.Runtime
             {
                 _log.Warn($"{Id} 写入失败：{ex.Message}");
             }
+        }
+
+        private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+        /// <summary>按字节读，按行切，解码时 UTF-8 优先、GBK 兜底。</summary>
+        private void Pump(Stream stream, bool isError)
+        {
+            var buffer = new byte[4096];
+            var pending = new List<byte>(4096);
+
+            try
+            {
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    for (var i = 0; i < read; i++)
+                    {
+                        var value = buffer[i];
+                        if (value == (byte)'\n')
+                        {
+                            EmitDecoded(pending, isError);
+                            pending.Clear();
+                        }
+                        else if (value != (byte)'\r')
+                        {
+                            pending.Add(value);
+                        }
+                    }
+                }
+                if (pending.Count > 0) EmitDecoded(pending, isError);
+            }
+            catch (Exception)
+            {
+                // 进程退出时流会断，正常现象
+            }
+        }
+
+        private void EmitDecoded(List<byte> bytes, bool isError)
+        {
+            if (bytes.Count == 0) return;
+
+            var data = bytes.ToArray();
+            string text;
+            try
+            {
+                text = StrictUtf8.GetString(data);
+            }
+            catch (DecoderFallbackException)
+            {
+                // 不是合法 UTF-8 —— 大概率是 GBK（java / 某些控制台程序）
+                text = Encoding.Default.GetString(data);
+            }
+
+            OnLine(isError ? "[stderr] " + text : text);
         }
 
         private void OnLine(string line)
