@@ -18,12 +18,22 @@ namespace PCL.Shell
             base.OnStartup(e);
 
             var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            // 命令行自检：提示词能不能取到、能不能进剪贴板（界面之外也能验）
+            if (Array.IndexOf(e.Args, "--copy-prompt") >= 0)
+            {
+                var prompt = PromptLibrary.Load();
+                var ok = ClipboardWriter.TrySetText(prompt, 6);
+                Console.WriteLine($"promptChars={prompt.Length} clipboard={ok}");
+                Shutdown(ok && prompt.Length > 500 ? 0 : 2);
+                return;
+            }
             _host = new ModuleHost(new ModuleHostOptions
             {
                 ModulesDirectory = Path.Combine(baseDirectory, "modules"),
                 LogFile = Path.Combine(baseDirectory, "logs", "modules.log"),
                 EchoToConsole = false,
-                HostName = "PCL Modular Shell",
+                HostName = "PAINCHARNWAV",
                 HostVersion = "1.0.0"
             });
 
@@ -34,7 +44,7 @@ namespace PCL.Shell
             }
             catch (Exception ex)
             {
-                MessageBox.Show("模块加载过程异常终止：\n" + ex, "PCL Modular", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("模块加载过程异常终止：\n" + ex, "PAINCHARNWAV", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown(1);
                 return;
             }
@@ -50,6 +60,11 @@ namespace PCL.Shell
             var window = new MainWindow(_host, report);
             MainWindow = window;
 
+            // 给离屏渲染用：--view add 直接停在"加一个包"那一页
+            var viewIndex = Array.IndexOf(e.Args, "--view");
+            if (viewIndex >= 0 && viewIndex + 1 < e.Args.Length && e.Args[viewIndex + 1] == "add")
+                window.ShowAddViewForRender();
+
             // 离屏渲染：给自动化验证用，不弹窗、不需要人盯着，也能确认界面真的画出来了
             var renderIndex = Array.IndexOf(e.Args, "--render");
             if (renderIndex >= 0)
@@ -57,9 +72,21 @@ namespace PCL.Shell
                 var target = renderIndex + 1 < e.Args.Length
                     ? e.Args[renderIndex + 1]
                     : Path.Combine(baseDirectory, "preview.png");
+                var width = 1080;
+                var height = 720;
+                var sizeIndex = Array.IndexOf(e.Args, "--size");
+                if (sizeIndex >= 0 && sizeIndex + 1 < e.Args.Length)
+                {
+                    var parts = e.Args[sizeIndex + 1].Split('x');
+                    if (parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h))
+                    {
+                        width = w;
+                        height = h;
+                    }
+                }
                 try
                 {
-                    RenderToFile(window, target, 1080, 720);
+                    RenderToFile(window, target, width, height);
                     Console.WriteLine("已渲染：" + target);
                     Shutdown(0);
                 }

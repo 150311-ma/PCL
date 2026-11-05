@@ -5,7 +5,11 @@
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
     <RootNamespace>PCL.Shell</RootNamespace>
-    <AssemblyName>PCL.Shell</AssemblyName>
+    <AssemblyName>PCV</AssemblyName>
+    <Product>PAINCHARNWAV</Product>
+    <AssemblyTitle>PAINCHARNWAV</AssemblyTitle>
+    <Company>PAINCHARNWAV</Company>
+    <ApplicationIcon>..\..\assets\pcv.ico</ApplicationIcon>
     <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <ApplicationIcon />
@@ -23,6 +27,12 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- 图标走资源 URI（/assets/pcv.png），提示词嵌进程序集，拷丢了也还在 -->
+  <ItemGroup>
+    <Resource Include="..\..\assets\pcv-256.png" Link="assets\pcv.png" />
+    <EmbeddedResource Include="..\..\assets\prompt-framework.md" LogicalName="PCV.prompt-framework.md" />
   </ItemGroup>
 
   <!--

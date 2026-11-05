@@ -2,9 +2,9 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="PCL" Height="760" Width="1000" MinHeight="600" MinWidth="820"
+        Title="PAINCHARNWAV" Height="730" Width="1000" MinHeight="620" MinWidth="840"
         WindowStyle="None" ResizeMode="CanResize" Background="#F3F6FB"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="CenterScreen" Icon="/assets/pcv.png"
         FontFamily="PingFang SC, MiSans, Microsoft YaHei UI, 微软雅黑" FontSize="13"
         AllowDrop="True" DragOver="Window_DragOver" DragLeave="Window_DragLeave" Drop="Window_Drop">
 
@@ -13,7 +13,6 @@
     </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- 玻璃面板：半透明白 + 白色高光边 + 柔和外阴影 = 液态玻璃的基本配方 -->
         <Style x:Key="GlassCard" TargetType="Border">
             <Setter Property="Background" Value="#59FFFFFF" />
             <Setter Property="BorderBrush" Value="#B3FFFFFF" />
@@ -60,17 +59,17 @@
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Background" Value="{DynamicResource ColorBrush3}" />
             <Setter Property="BorderBrush" Value="#33FFFFFF" />
-            <Setter Property="Height" Value="42" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="FontSize" Value="13.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="26,0" />
+            <Setter Property="Padding" Value="22,0" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Shell" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="21">
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="20">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.35"
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.30"
                                                   Color="{DynamicResource ColorObject3}" />
                             </Border.Effect>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -111,10 +110,22 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 24 格线性图标：统一 1.6 描边、圆头圆角，缩到 16px 也不糊 -->
+        <Style x:Key="LineIcon" TargetType="Path">
+            <Setter Property="Stroke" Value="{DynamicResource ColorBrush3}" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+        </Style>
     </Window.Resources>
 
     <Grid>
-        <!-- ══ 背景：柔光斑，玻璃卡片就是盖在它上面的 ══ -->
+        <!-- 背景：柔光斑，玻璃卡片盖在它上面 -->
         <Grid ClipToBounds="True">
             <Rectangle>
                 <Rectangle.Fill>
@@ -146,17 +157,17 @@
             </Ellipse>
         </Grid>
 
-        <!-- 顶部 1px 高光：玻璃边缘的反光，别小看这一条，有没有差很多 -->
+        <!-- 顶部 1px 高光 -->
         <Border Height="1" VerticalAlignment="Top" Margin="26,0" Background="#E6FFFFFF" />
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="52" />
+                <RowDefinition Height="54" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="46" />
             </Grid.RowDefinitions>
 
-            <!-- ══ 标题栏 ══ -->
+            <!-- 标题栏 -->
             <Grid Grid.Row="0" Margin="18,0,10,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -165,67 +176,62 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="26" Height="26" CornerRadius="9" Background="{DynamicResource ColorBrush3}">
-                        <TextBlock Text="P" Foreground="White" FontSize="14" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="PCL" FontSize="15" FontWeight="SemiBold" Margin="10,0,0,0"
+                    <Image Source="/assets/pcv.png" Width="26" Height="26"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="PAINCHARNWAV" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
                                VerticalAlignment="Center" Foreground="{DynamicResource ColorBrush1}" />
-                    <Border Background="#33000000" CornerRadius="8" Padding="7,2" Margin="8,0,0,0"
+                    <Border Background="#33000000" CornerRadius="8" Padding="7,2" Margin="9,0,0,0"
                             VerticalAlignment="Center">
-                        <TextBlock x:Name="LabVersion" Text="1.0.0" FontSize="11" Foreground="#5B6472" />
+                        <TextBlock x:Name="LabVersion" Text="PCV 1.0.0" FontSize="10.5" Foreground="#5B6472" />
                     </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="BtnMin" Style="{StaticResource ChromeButton}" Click="BtnMin_Click">
+                    <Button Style="{StaticResource ChromeButton}" Click="BtnMin_Click">
                         <Rectangle Width="11" Height="1.6" Fill="#5B6472" />
                     </Button>
-                    <Button x:Name="BtnClose" Style="{StaticResource ChromeButton}" Click="BtnClose_Click" Margin="4,0,0,0">
+                    <Button Style="{StaticResource ChromeButton}" Click="BtnClose_Click" Margin="4,0,0,0">
                         <Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="#5B6472" StrokeThickness="1.6"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
                     </Button>
                 </StackPanel>
             </Grid>
 
-            <!-- ══ 唯一的一页 ══ -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,0">
-                <StackPanel Margin="46,14,46,26" MaxWidth="980">
+            <!-- ══ 页一：首页 ══ -->
+            <ScrollViewer x:Name="ViewHome" Grid.Row="1" VerticalScrollBarVisibility="Hidden"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="46,18,46,26" MaxWidth="980">
 
-                    <TextBlock Text="把功能框架拖进来" FontSize="34" FontWeight="Bold"
+                    <TextBlock Text="装个框架包" FontSize="32" FontWeight="Bold"
                                Foreground="{DynamicResource ColorBrush1}" />
-                    <TextBlock Margin="2,10,0,26" FontSize="13.5" Foreground="#66707F" TextWrapping="Wrap"
-                               Text="PCL 只是一个空壳：首页之外的能力全部来自功能框架。支持 .pclpkg / .zip，拖进来就装好，装完立刻生效。" />
+                    <TextBlock Margin="2,8,0,24" FontSize="13" Foreground="#66707F" TextWrapping="Wrap"
+                               Text="PCV 自己不带功能。要什么，装对应的包。" />
 
-                    <!-- 拖放区 -->
-                    <Grid x:Name="DropZoneArea" Height="212" AllowDrop="True">
+                    <Grid Height="206" AllowDrop="True">
                         <Rectangle x:Name="DropFrame" RadiusX="24" RadiusY="24" Fill="#33FFFFFF"
                                    Stroke="#8FA9C6" StrokeThickness="1.6" StrokeDashArray="5 4" />
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <Border x:Name="DropIcon" Width="62" Height="62" CornerRadius="20"
-                                    Background="#66FFFFFF" BorderBrush="#99FFFFFF" BorderThickness="1"
-                                    HorizontalAlignment="Center">
-                                <Path Data="M8,20 L8,10 A2,2 0 0 1 10,8 L26,8 A2,2 0 0 1 28,10 L28,20 A2,2 0 0 1 26,22 L10,22 A2,2 0 0 1 8,20 Z M10,26 L26,26"
-                                      Stroke="{DynamicResource ColorBrush3}" StrokeThickness="1.8"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                            <Border Width="60" Height="60" CornerRadius="20" Background="#66FFFFFF"
+                                    BorderBrush="#99FFFFFF" BorderThickness="1" HorizontalAlignment="Center">
+                                <Path Style="{StaticResource LineIcon}"
+                                      Data="M4 14.5 V18.5 A1.5 1.5 0 0 0 5.5 20 H18.5 A1.5 1.5 0 0 0 20 18.5 V14.5 M12 3.5 V13.8 M8.2 10 L12 13.8 L15.8 10"
                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock x:Name="LabDropTitle" Text="拖入 .pclpkg 文件" FontSize="16" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center" Margin="0,14,0,0"
+                            <TextBlock x:Name="LabDropTitle" Text="拖一个 .pclpkg 进来" FontSize="15.5"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,13,0,0"
                                        Foreground="{DynamicResource ColorBrush1}" />
-                            <TextBlock x:Name="LabDropHint" Text="也可以点下面的按钮从资源管理器里选"
-                                       FontSize="12.5" HorizontalAlignment="Center" Margin="0,6,0,0" Foreground="#7C8798" />
-                            <Button x:Name="BtnChoose" Content="选择功能框架包" Style="{StaticResource AccentButton}"
-                                    Margin="0,18,0,0" Click="BtnChoose_Click" />
+                            <TextBlock Text="拖不进来就点按钮，一样" FontSize="12" HorizontalAlignment="Center"
+                                       Margin="0,5,0,0" Foreground="#7C8798" />
+                            <Button Content="选框架包" Style="{StaticResource AccentButton}"
+                                    Margin="0,16,0,0" Click="BtnOpenAdd_Click" />
                         </StackPanel>
                     </Grid>
 
-                    <!-- 已装框架 -->
-                    <Grid Margin="2,32,0,10">
-                        <TextBlock Text="已装框架" FontSize="17" FontWeight="SemiBold"
+                    <Grid Margin="2,30,0,10">
+                        <TextBlock Text="已经装了的" FontSize="16" FontWeight="SemiBold"
                                    Foreground="{DynamicResource ColorBrush1}" />
                         <TextBlock x:Name="LabCount" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   FontSize="12.5" Foreground="#7C8798" Text="0 个" />
+                                   FontSize="12" Foreground="#7C8798" Text="0 个" />
                     </Grid>
 
                     <ItemsControl x:Name="ListModules">
@@ -241,14 +247,14 @@
 
                                         <Border Width="40" Height="40" CornerRadius="13" Background="{DynamicResource ColorBrush6}"
                                                 VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Initial}" FontSize="16" FontWeight="Bold"
+                                            <TextBlock Text="{Binding Initial}" FontSize="15" FontWeight="Bold"
                                                        Foreground="{DynamicResource ColorBrush2}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold"
+                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource ColorBrush1}" />
                                                 <TextBlock Text="{Binding Version}" FontSize="11.5" Margin="8,2,0,0"
                                                            Foreground="#8A94A3" />
@@ -257,13 +263,13 @@
                                                     <TextBlock Text="{Binding State}" FontSize="10.5" Foreground="#1B8A4B" />
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="#7C8798"
+                                            <TextBlock Text="{Binding Detail}" FontSize="11.5" Foreground="#7C8798"
                                                        Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
 
                                         <Button Grid.Column="2" Content="卸载" Tag="{Binding Id}"
-                                                Click="BtnUninstall_Click" Height="30"
-                                                Padding="12,0" FontSize="12" VerticalAlignment="Center">
+                                                Click="BtnUninstall_Click" Height="28"
+                                                Padding="12,0" FontSize="11.5" VerticalAlignment="Center">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                                     <Style.Triggers>
@@ -280,19 +286,143 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock x:Name="LabEmpty" Text="还没有装任何功能框架。基础框架 pcl.core 是内置的，不需要装。"
-                               FontSize="12.5" Foreground="#8A94A3" Margin="4,4,0,0" Visibility="Collapsed" />
+                    <TextBlock x:Name="LabEmpty" Text="空的。pcl.core 是自带的，不用管。"
+                               FontSize="12" Foreground="#8A94A3" Margin="4,4,0,0" Visibility="Collapsed" />
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- ══ 状态栏 ══ -->
+            <!-- ══ 页二：加一个包 ══ -->
+            <ScrollViewer x:Name="ViewAdd" Grid.Row="1" VerticalScrollBarVisibility="Hidden"
+                          HorizontalScrollBarVisibility="Disabled" VerticalContentAlignment="Center"
+                          Visibility="Collapsed">
+                <StackPanel Margin="46,10,46,26" MaxWidth="980">
+
+                    <Button Style="{StaticResource GhostButton}" Width="92" Height="30"
+                            HorizontalAlignment="Left" Padding="10,0" Click="BtnBack_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M6 1 L1 6 L6 11" Stroke="#4A5563" StrokeThickness="1.6"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="12" Height="12"
+                                  Stretch="Uniform" VerticalAlignment="Center" />
+                            <TextBlock Text="回去" Margin="5,0,0,0" FontSize="12" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Text="加一个框架包" FontSize="30" FontWeight="Bold" Margin="0,16,0,0"
+                               Foreground="{DynamicResource ColorBrush1}" />
+                    <TextBlock Text="装现成的，或者自己做一个。" FontSize="13" Foreground="#66707F" Margin="2,8,0,22" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 导入 -->
+                        <Border Style="{StaticResource GlassCard}" Padding="24,20" MinHeight="212">
+                            <StackPanel>
+                                <Border Width="44" Height="44" CornerRadius="14" Background="#66FFFFFF"
+                                        BorderBrush="#99FFFFFF" BorderThickness="1" HorizontalAlignment="Left">
+                                    <Path Style="{StaticResource LineIcon}"
+                                          Data="M4 14.5 V18.5 A1.5 1.5 0 0 0 5.5 20 H18.5 A1.5 1.5 0 0 0 20 18.5 V14.5 M12 3.5 V13.8 M8.2 10 L12 13.8 L15.8 10"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="导入现成的包" FontSize="16.5" FontWeight="SemiBold" Margin="0,16,0,0"
+                                           Foreground="{DynamicResource ColorBrush1}" />
+                                <TextBlock TextWrapping="Wrap" FontSize="12.5" Foreground="#6E7887" Margin="0,8,0,0"
+                                           LineHeight="20"
+                                           Text="从硬盘里挑一个 .pclpkg 装上。直接拖进窗口也行，两条路一个口子。" />
+                                <Button Content="选文件" Style="{StaticResource AccentButton}" Width="116"
+                                        HorizontalAlignment="Left" Margin="0,20,0,0" Click="BtnChooseFile_Click" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 制作 -->
+                        <Border Grid.Column="2" Style="{StaticResource GlassCard}" Padding="24,20" MinHeight="212">
+                            <StackPanel>
+                                <Border Width="44" Height="44" CornerRadius="14" Background="#66FFFFFF"
+                                        BorderBrush="#99FFFFFF" BorderThickness="1" HorizontalAlignment="Left">
+                                    <Path Style="{StaticResource LineIcon}"
+                                          Data="M12 3.6 L13.7 9.4 L19.4 11.1 L13.7 12.8 L12 18.6 L10.3 12.8 L4.6 11.1 L10.3 9.4 Z"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="做一个新的" FontSize="16.5" FontWeight="SemiBold" Margin="0,16,0,0"
+                                           Foreground="{DynamicResource ColorBrush1}" />
+                                <TextBlock TextWrapping="Wrap" FontSize="12.5" Foreground="#6E7887" Margin="0,8,0,0"
+                                           LineHeight="20"
+                                           Text="打开 DeepSeek，制作说明已经在剪贴板里。粘过去，它给一段脚本，跑完包就有了。" />
+                                <Button x:Name="BtnMake" Content="打开 DeepSeek" Style="{StaticResource AccentButton}"
+                                        Width="150" HorizontalAlignment="Left" Margin="0,20,0,0" Click="BtnMake_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- 三步说明：写完就走这条路，别让人猜 -->
+                    <Grid Margin="6,30,6,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="24" Height="24" CornerRadius="12" Background="#33FFFFFF"
+                                    BorderBrush="#7AFFFFFF" BorderThickness="1" VerticalAlignment="Top">
+                                <TextBlock Text="1" FontSize="11.5" FontWeight="Bold"
+                                           Foreground="{DynamicResource ColorBrush3}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Margin="10,0,18,0">
+                                <TextBlock Text="复制说明" FontSize="12.5" FontWeight="SemiBold" Foreground="#4A5563" />
+                                <TextBlock Text="点按钮，说明进剪贴板" FontSize="11.5" Foreground="#8A94A3"
+                                           Margin="0,3,0,0" TextWrapping="Wrap" LineHeight="17" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Border Width="24" Height="24" CornerRadius="12" Background="#33FFFFFF"
+                                    BorderBrush="#7AFFFFFF" BorderThickness="1" VerticalAlignment="Top">
+                                <TextBlock Text="2" FontSize="11.5" FontWeight="Bold"
+                                           Foreground="{DynamicResource ColorBrush3}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Margin="10,0,18,0">
+                                <TextBlock Text="丢给 DeepSeek" FontSize="12.5" FontWeight="SemiBold" Foreground="#4A5563" />
+                                <TextBlock Text="它会回一段 Python" FontSize="11.5" Foreground="#8A94A3"
+                                           Margin="0,3,0,0" TextWrapping="Wrap" LineHeight="17" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Border Width="24" Height="24" CornerRadius="12" Background="#33FFFFFF"
+                                    BorderBrush="#7AFFFFFF" BorderThickness="1" VerticalAlignment="Top">
+                                <TextBlock Text="3" FontSize="11.5" FontWeight="Bold"
+                                           Foreground="{DynamicResource ColorBrush3}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Margin="10,0,0,0">
+                                <TextBlock Text="跑脚本" FontSize="12.5" FontWeight="SemiBold" Foreground="#4A5563" />
+                                <TextBlock Text="把 .pclpkg 拖回窗口" FontSize="11.5" Foreground="#8A94A3"
+                                           Margin="0,3,0,0" TextWrapping="Wrap" LineHeight="17" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border x:Name="PanCopied" Background="#3322A06B" CornerRadius="12" Padding="14,11" Margin="0,18,0,0"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="LabCopied" TextWrapping="Wrap" FontSize="12.5" Foreground="#1B6B45"
+                                   LineHeight="19" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 状态栏 -->
             <Border Grid.Row="2" Background="#33FFFFFF" Padding="24,0">
                 <Grid>
                     <TextBlock x:Name="LabStatus" VerticalAlignment="Center" FontSize="12.5"
-                               Foreground="#66707F" TextTrimming="CharacterEllipsis"
-                               Text="就绪" />
+                               Foreground="#66707F" TextTrimming="CharacterEllipsis" Text="好了" />
                     <TextBlock x:Name="LabFooter" HorizontalAlignment="Right" VerticalAlignment="Center"
-                               FontSize="12" Foreground="#8A94A3" />
+                               FontSize="11.5" Foreground="#8A94A3" />
                 </Grid>
             </Border>
         </Grid>

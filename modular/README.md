@@ -1,7 +1,10 @@
-# PCL 多模块化改造
+# PAINCHARNWAV（PCV）
+
+> 名字：**PAINCHARNWAV**，日常叫 **PCV**。代码里的 `pcl.*` 模块 Id 没改——那是底层框架的名字，
+> 改它等于把所有已装包的路径全打乱，不值当。
 
 把 PCL（Plain Craft Launcher 2，VB.NET / .NET Framework 4.8 / WPF）从**单程序集全局状态**
-改成**模块加载器 + 契约 + 独立模块**的结构。
+改成**模块加载器 + 契约 + 独立模块**的结构，再在外面套一层自己的壳。
 
 本目录是改造后的骨架，**不动**仓库里原有的 `Plain Craft Launcher 2/` 单体工程：
 它作为对照实现保留，随时可以和上游 `Meloong-Git/PCL` 同步，不会因为改造而失去追溯能力。
@@ -52,9 +55,9 @@ UI 模块在独立仓库里，见 `ARCHITECTURE.md` 的仓库表。
 
 整个程序**只有一页**：拖包 → 装 → 立刻可用。左边是刚启动的样子，右边是拖进示例框架之后的样子。
 
-| 刚装好 | 拖进示例框架后 |
+| 首页 | 点"选框架包"之后的第二页 |
 | --- | --- |
-| ![首页](docs/home-default.png) | ![已装](docs/home-installed.png) |
+| ![首页](docs/pcv-home.png) | ![加包](docs/pcv-add.png) |
 
 两张图都是同一份代码离屏渲染出来的（`--render`），不是画的效果图。
 
@@ -206,3 +209,40 @@ PCL.Modular.Cli.exe --modules <目录>                 → 4 个模块，全部�
 
 验证：`dotnet build "Plain Craft Launcher 2.sln"` → **0 警告 0 错误**；源码里已无
 `CurrentRank / DonationRank / InputPotatoCode / GetIdentify / 土豆码 / 赞助` 的引用。
+
+## 十、制作自己的框架包（2026-11-05 追加）
+
+首页点「选框架包」进第二页，两条路：**导入现成的** 或 **做一个新的**。
+
+点「打开 DeepSeek」会做两件事：把制作说明写进剪贴板，然后打开 `chat.deepseek.com`。
+说明全文在 `assets/prompt-framework.md`，嵌进了程序集（`PCV.prompt-framework.md`），
+不会因为文件被挪走就失效。
+
+### 那份说明要求 AI 输出什么
+
+DeepSeek 不能直接给文件，所以说明里把它逼到一个格式上：**只准输出一个 Python 脚本**。
+脚本自己干完这些事：
+
+1. 写 `module.json`、`.csproj`、入口 `.cs`；
+2. 调 `dotnet build -c Release` 编出 dll；
+3. 把 `module.json` 和 dll 打进 `.pclpkg`；
+4. 打印包的绝对路径，出错非 0 退出。
+
+说明里还附了一份能直接跑的骨架（`PCV_DIR`、`id`、入口类都留了 TODO），
+AI 只要替换内容就行，不用它自己发明结构。契约程序集路径写的是
+`{PCV 安装目录}\PCL.Modular.Abstractions.dll`，`Private=false`，包里不会多带一份。
+
+### 这条链验证到哪一步
+
+- 提示词已嵌入：`PCV.exe --copy-prompt` → `promptChars=4405 clipboard=True`（退出码 0）；
+- 剪贴板内容外部读回，4405 字，首尾都对；
+- 生成的包能装：`PCL.Demo.Hello-1.0.0.pclpkg` 就是这个格式，装完 4 个模块都在跑。
+
+**没验证的部分**：没有真的拿 DeepSeek 生成一遍再装。这一步要人去看它的输出，
+我能保证的是"说明足够明确 + 产物格式与安装器检查项一一对应"，不是"AI 一定写对"。
+
+### 剪贴板为什么不用 WPF 的 Clipboard
+
+这台机器上 `Clipboard.SetDataObject` 一直抛 `CLIPBRD_E_CANT_OPEN`（重试 8 次也不行），
+换成 Win32 的 `OpenClipboard` / `SetClipboardData` 一次就过。代码在 `ClipboardWriter.cs`，
+注释里写了原因——免得以后有人"顺手改回 WPF 的写法"。

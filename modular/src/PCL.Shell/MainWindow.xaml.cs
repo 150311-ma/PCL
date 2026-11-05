@@ -1,28 +1,27 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using PCL.Modular.Abstractions;
-using PCL.Modular.Contracts;
 using PCL.Modular.Host;
 using PCL.Modular.Packages;
 
 namespace PCL.Shell
 {
     /// <summary>
-    /// 唯一的一页：拖包 → 装 → 立刻可用。
-    ///
-    /// 界面之外没有第二个页面、没有侧边栏、没有设置页。
-    /// 能力全部来自 modules 目录，壳只负责"装载、展示、装包、卸载"。
+    /// 两页：首页（装包 + 已装列表）和"加一个包"（导入 / 自己做）。
+    /// 没有第三页，也没有设置页——PCV 本身没有功能可设置。
     /// </summary>
     public partial class MainWindow : Window
     {
+        private const string DeepSeekUrl = "https://chat.deepseek.com/";
+
         private readonly ModuleHost _host;
         private readonly PackageInstaller _installer;
-        private readonly IThemeService _theme;
         private readonly ObservableCollection<FrameworkCard> _cards = new ObservableCollection<FrameworkCard>();
         private ModuleLoadReport _report;
 
@@ -33,10 +32,8 @@ namespace PCL.Shell
             InitializeComponent();
 
             _installer = new PackageInstaller(host.ModulesDirectory, host.Log);
-            host.Services.TryGet(out _theme);
-
             ListModules.ItemsSource = _cards;
-            LabVersion.Text = host.Host.Version;
+            LabVersion.Text = "PCV " + host.Host.Version;
             RefreshModules();
 
             Loaded += (s, e) => GlassHelper.TryEnableRoundedCorners(this);
@@ -58,18 +55,17 @@ namespace PCL.Shell
                     Name = entry.Manifest?.DisplayName ?? record?.Name ?? entry.Id,
                     Version = entry.Manifest?.Version ?? record?.Version ?? "?",
                     State = StateText(entry.State),
-                    Detail = entry.Error ?? entry.Manifest?.Description ?? "由内置模块提供",
+                    Detail = entry.Error ?? entry.Manifest?.Description ?? "自带",
                     Initial = Initial(entry.Id),
                     CanUninstall = !string.Equals(entry.Id, "pcl.core", StringComparison.OrdinalIgnoreCase)
                 });
             }
 
-            LabCount.Text = $"{_report.StartedCount} 个运行中 / 共 {_report.Entries.Count} 个";
+            LabCount.Text = $"{_report.StartedCount} 个跑着 / 一共 {_report.Entries.Count} 个";
             LabEmpty.Visibility = _cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            LabFooter.Text = "模块目录 modules\\　·　日志 logs\\modules.log";
+            LabFooter.Text = "modules\\　·　logs\\modules.log";
         }
 
-        /// <summary>用模块 Id 的最后一段取首字母：pcl.core → C，pcl.theme → T，比一排 P 好认。</summary>
         private static string Initial(string moduleId)
         {
             if (string.IsNullOrWhiteSpace(moduleId)) return "?";
@@ -82,11 +78,11 @@ namespace PCL.Shell
         {
             switch (state)
             {
-                case ModuleState.Started: return "运行中";
-                case ModuleState.Loaded: return "已加载";
-                case ModuleState.Stopped: return "已停止";
-                case ModuleState.Skipped: return "已跳过";
-                case ModuleState.Failed: return "失败";
+                case ModuleState.Started: return "在跑";
+                case ModuleState.Loaded: return "已载入";
+                case ModuleState.Stopped: return "停了";
+                case ModuleState.Skipped: return "跳过";
+                case ModuleState.Failed: return "挂了";
                 default: return state.ToString();
             }
         }
@@ -97,6 +93,85 @@ namespace PCL.Shell
             LabStatus.Foreground = isError
                 ? new SolidColorBrush(Color.FromRgb(0xC0, 0x39, 0x2B))
                 : new SolidColorBrush(Color.FromRgb(0x4A, 0x55, 0x63));
+        }
+
+        // ── 两页切换 ────────────────────────────────────────────────────────
+
+        private void ShowHome()
+        {
+            ViewAdd.Visibility = Visibility.Collapsed;
+            ViewHome.Visibility = Visibility.Visible;
+            SetStatus("好了");
+        }
+
+        private void BtnOpenAdd_Click(object sender, RoutedEventArgs e)
+        {
+            ViewHome.Visibility = Visibility.Collapsed;
+            ViewAdd.Visibility = Visibility.Visible;
+            SetStatus("挑一条：装现成的，或者自己做一个");
+        }
+
+        private void BtnBack_Click(object sender, RoutedEventArgs e) => ShowHome();
+
+        /// <summary>离屏渲染时直接切到第二页，省得为了截图去模拟点击。</summary>
+        public void ShowAddViewForRender()
+        {
+            ViewHome.Visibility = Visibility.Collapsed;
+            ViewAdd.Visibility = Visibility.Visible;
+            SetStatus("挑一条：装现成的，或者自己做一个");
+        }
+
+        // ── 导入 ────────────────────────────────────────────────────────────
+
+        private void BtnChooseFile_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "挑一个框架包",
+                Filter = "框架包 (*.pclpkg;*.zip)|*.pclpkg;*.zip|所有文件 (*.*)|*.*",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) == true) InstallPackage(dialog.FileName);
+        }
+
+        // ── 制作：复制提示词 + 打开 DeepSeek ────────────────────────────────
+
+        private void BtnMake_Click(object sender, RoutedEventArgs e)
+        {
+            var prompt = GetPrompt();
+            var copied = TrySetClipboard(prompt);
+
+            PanCopied.Visibility = Visibility.Visible;
+            if (copied)
+            {
+                LabCopied.Text = $"制作说明复制好了（{prompt.Length} 字）。粘到 DeepSeek 输入框发出去，" +
+                                 "它会给你一段 Python 脚本；跑完得到一个 .pclpkg，拖回这个窗口就能装。";
+                SetStatus("已复制，DeepSeek 正在打开");
+            }
+            else
+            {
+                LabCopied.Text = "剪贴板被别的程序占着，没写进去。再点一次按钮试试。";
+                SetStatus("剪贴板没写进去", true);
+            }
+
+            BtnMake.Content = "再开一次";
+            TryOpenUrl(DeepSeekUrl);
+        }
+
+        private string GetPrompt() => PromptLibrary.Load();
+
+        private static bool TrySetClipboard(string text) => ClipboardWriter.TrySetText(text);
+
+        private static void TryOpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(url);
+            }
+            catch (Exception)
+            {
+                // 没默认浏览器就只留在剪贴板里，不弹错误框打断用户
+            }
         }
 
         // ── 拖放 ────────────────────────────────────────────────────────────
@@ -125,7 +200,7 @@ namespace PCL.Shell
                 : new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
             DropFrame.StrokeThickness = accepted ? 2.2 : 1.6;
             DropFrame.Fill = new SolidColorBrush(Color.FromArgb(accepted ? (byte)0x66 : (byte)0x33, 0xFF, 0xFF, 0xFF));
-            LabDropTitle.Text = accepted ? "松手就装" : "只接受 .pclpkg / .zip";
+            LabDropTitle.Text = accepted ? "松手就装" : "只认 .pclpkg";
         }
 
         private void Window_DragLeave(object sender, DragEventArgs e) => ResetDropZone();
@@ -143,25 +218,13 @@ namespace PCL.Shell
             DropFrame.Stroke = new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
             DropFrame.StrokeThickness = 1.6;
             DropFrame.Fill = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
-            LabDropTitle.Text = "拖入 .pclpkg 文件";
+            LabDropTitle.Text = "拖一个 .pclpkg 进来";
         }
 
-        // ── 安装 ────────────────────────────────────────────────────────────
-
-        private void BtnChoose_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Title = "选择功能框架包",
-                Filter = "功能框架包 (*.pclpkg;*.zip)|*.pclpkg;*.zip|所有文件 (*.*)|*.*",
-                CheckFileExists = true
-            };
-            if (dialog.ShowDialog(this) == true) InstallPackage(dialog.FileName);
-        }
+        // ── 安装 / 卸载 ─────────────────────────────────────────────────────
 
         private void InstallPackage(string path)
         {
-            // 1. 先只读检查，问题在动盘之前就说清楚
             var inspection = _installer.Inspect(path);
             if (!inspection.IsValid)
             {
@@ -169,27 +232,25 @@ namespace PCL.Shell
                 return;
             }
 
-            // 2. 已存在就明确问一次，绝不悄悄覆盖
             var target = Path.Combine(_installer.ModulesDirectory, inspection.Manifest.Id);
             var overwrite = false;
             if (Directory.Exists(target))
             {
                 var answer = MessageBox.Show(this,
-                    $"已经装过 {inspection.Manifest.DisplayName} 了。\n" +
-                    $"用包里的 {inspection.Manifest.Version} 覆盖它吗？\n" +
-                    "旧版本会保留在 modules\\.backup，装坏了能拿回来。",
-                    "确认覆盖", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                    $"已经装了 {inspection.Manifest.DisplayName}。\n" +
+                    $"换成包里的 {inspection.Manifest.Version}？\n" +
+                    "旧的会留在 modules\\.backup，装坏了能拿回来。",
+                    "覆盖", MessageBoxButton.OKCancel, MessageBoxImage.Question);
                 if (answer != MessageBoxResult.OK)
                 {
-                    SetStatus("已取消覆盖安装");
+                    SetStatus("没换");
                     return;
                 }
                 overwrite = true;
             }
 
-            SetStatus($"正在安装 {inspection.Manifest.DisplayName}…");
+            SetStatus($"在装 {inspection.Manifest.DisplayName}…");
 
-            // 3. 提交
             var result = _installer.Install(path, overwrite);
             if (!result.Success)
             {
@@ -197,29 +258,27 @@ namespace PCL.Shell
                 return;
             }
 
-            // 4. 重载模块表，让新框架立刻可用
             _report = _host.ReloadAll();
             RefreshModules();
+            ShowHome();
 
             var loaded = _report.Entries.FirstOrDefault(m => string.Equals(m.Id, result.ModuleId, StringComparison.OrdinalIgnoreCase));
             if (loaded != null && loaded.State == ModuleState.Started)
-                SetStatus($"{result.Message}，已生效。");
+                SetStatus($"{result.Message}。能用了。");
             else if (loaded != null)
-                SetStatus($"{result.Message}，但加载失败：{loaded.Error}", true);
+                SetStatus($"{result.Message}，但没起来：{loaded.Error}", true);
             else
-                SetStatus($"{result.Message}。");
+                SetStatus(result.Message);
         }
-
-        // ── 卸载 ────────────────────────────────────────────────────────────
 
         private void BtnUninstall_Click(object sender, RoutedEventArgs e)
         {
             if (!(sender is FrameworkElement element) || !(element.Tag is string moduleId)) return;
 
             var answer = MessageBox.Show(this,
-                $"确定卸载 {moduleId} 吗？\n\n" +
-                "卸载会把它移出模块目录；已经加载进内存的那一份要等重启才彻底消失。",
-                "卸载功能框架", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                $"卸掉 {moduleId}？\n\n" +
+                "文件会被移出模块目录，重启后彻底不见。",
+                "卸载", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
             if (answer != MessageBoxResult.OK) return;
 
             if (!_installer.Uninstall(moduleId, out var message))
@@ -230,7 +289,7 @@ namespace PCL.Shell
 
             _report = _host.ReloadAll();
             RefreshModules();
-            SetStatus($"{moduleId} 已卸载。{message}");
+            SetStatus($"{moduleId} 卸了。{message}");
         }
 
         // ── 窗口 ────────────────────────────────────────────────────────────
