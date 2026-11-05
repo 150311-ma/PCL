@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>PCL.Shell</RootNamespace>
+    <AssemblyName>PCL.Shell</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj" />
+    <ProjectReference Include="..\PCL.Modular.Host\PCL.Modular.Host.csproj" />
+    <!-- 只保证先构建模块，不产生编译期引用：壳永远不直接 new 模块里的类型 -->
+    <ProjectReference Include="..\PCL.Core\PCL.Core.vbproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\PCL.Theme\PCL.Theme.vbproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\PCL.Launch.Microsoft\PCL.Launch.Microsoft.vbproj" ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!--
+    把每个模块摆成 <输出目录>/modules/<模块 Id>/ 的形状：
+    加载器只认目录 + module.json，所以这里必须按 Id 建目录，不能全丢一个文件夹。
+    只复制模块自己的 dll 与清单，契约 dll 由宿主提供，避免同名程序集被重复加载。
+  -->
+  <Target Name="ArrangeModules" AfterTargets="Build">
+    <ItemGroup>
+      <CoreModuleFiles Include="..\PCL.Core\bin\$(Configuration)\PCL.Core.dll" />
+      <CoreModuleFiles Include="..\PCL.Core\module.json" />
+      <ThemeModuleFiles Include="..\PCL.Theme\bin\$(Configuration)\PCL.Theme.dll" />
+      <ThemeModuleFiles Include="..\PCL.Theme\module.json" />
+      <LoginModuleFiles Include="..\PCL.Launch.Microsoft\bin\$(Configuration)\PCL.Launch.Microsoft.dll" />
+      <LoginModuleFiles Include="..\PCL.Launch.Microsoft\module.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CoreModuleFiles)" DestinationFolder="$(OutDir)modules\pcl.core" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ThemeModuleFiles)" DestinationFolder="$(OutDir)modules\pcl.theme" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(LoginModuleFiles)" DestinationFolder="$(OutDir)modules\pcl.launch.microsoft" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
