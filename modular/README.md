@@ -48,8 +48,17 @@ modular/
 
 UI 模块在独立仓库里，见 `ARCHITECTURE.md` 的仓库表。
 
-## 四、构建与验证
+## 四、跑起来是什么样
 
+壳程序本身没有任何业务代码，界面上的东西全部来自模块：
+
+| 默认主题 | 切换到紫罗兰 |
+| --- | --- |
+| ![默认主题](docs/shell-blue.png) | ![紫罗兰](docs/shell-violet.png) |
+
+两张图是同一份代码离屏渲染出来的（`--render`），颜色差异来自 `pcl.theme` 真的改了资源字典。
+
+## 五、构建与验证
 ```bat
 cd modular
 dotnet build PCL.Modular.sln
@@ -77,7 +86,7 @@ src\PCL.Modular.Cli\bin\Debug\PCL.Modular.Cli.exe --inject-fault
 src\PCL.Shell\bin\Debug\PCL.Shell.exe --render preview.png --theme violet
 ```
 
-## 五、加载器规则（刻意做成可判定）
+## 六、加载器规则（刻意做成可判定）
 
 1. **只认 `module.json`**，不扫程序集特性，不猜约定；
 2. **依赖拓扑排序**，循环依赖整组判失败，不做"尽力加载"；
