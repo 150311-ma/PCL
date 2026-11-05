@@ -95,3 +95,34 @@ src\PCL.Shell\bin\Debug\PCL.Shell.exe --render preview.png --theme violet
 5. **`OnStart` 逆序 `OnStop`**，退出时按依赖反向收尾。
 
 这些规则每一条都有对应的注入用例，`--inject-fault` 会逐条验证。
+
+## 七、本体工程翻新
+
+`Plain Craft Launcher 2/Plain Craft Launcher 2.vbproj` 从老式工程（ToolsVersion 15、逐个文件列举）改成 SDK 风格，
+现在**不用装 Visual Studio 也能 `dotnet build`**：
+
+| 项 | 翻新前 | 翻新后 |
+| --- | --- | --- |
+| 文件清单 | 手工维护 112 个 `<Compile>` / 60 个 `<Page>` / 52 个 `<Resource>` | MSBuild 自动收集 |
+| 配置 | Debug 与 Snapshot 都定义 `SNAPSHOT`，靠 VS 切换 | Debug / Release / Snapshot 三个条件组，一眼看清 |
+| 参考程序集 | 依赖机器上装 VS 的 .NET Framework Developer Pack | 引 `Microsoft.NETFramework.ReferenceAssemblies` 包，任何机器 `dotnet build` 可编 |
+| 全局 Imports | 30 条 | 原样保留（代码里从不写 Imports，少一条就是成片"未定义类型"） |
+
+翻新时踩到、并且已经写进工程注释的三个坑：
+
+1. **自动 glob 不等于老工程清单**。`Controls/MySliderDot.xaml(.vb)` 在磁盘上，但老工程从来没编译过它
+   （引用了 `MathRange` / `SetTop` / `FrmMain.SliderDrag_Finish` 等根本不存在的成员，是上游遗留的死文件）。
+   SDK 会自动把它捡进来，必须显式 `Remove`。核对方法：老工程 `<Compile>` 112 条 vs 磁盘 113 个 `.vb`，差的就是它。
+2. **`Application.xaml` 不叫 `App.xaml`**。SDK 默认只把 `App.xaml` 当 `ApplicationDefinition`，
+   这里要关掉默认项再显式声明，否则会被当成普通 Page，`Main` 就没了。
+3. **`AssemblyName` 必须保持 `Plain Craft Launcher 2`**。代码里所有
+   `pack://application:,,,/Plain Craft Launcher 2;component/Images/...` 都靠它，改名等于全站图片失联。
+
+验证结果：
+
+- `dotnet build` → **0 警告 0 错误**，产出 `bin\Plain Craft Launcher 2.exe` 与全部依赖；
+- 直接启动本体，`PCL\Log1.txt` 里能看到完整的初始化链路（模块加载 → Java 扫描 → 版本列表拉取 → 主窗口 DPI），
+  界面正常渲染：
+
+![本体运行](docs/pcl-running.png)
+
