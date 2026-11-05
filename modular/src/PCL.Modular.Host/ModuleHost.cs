@@ -361,6 +361,21 @@ namespace PCL.Modular.Host
 
         public ModuleLoadReport BuildReport() => new ModuleLoadReport(_entries, _options.ModulesDirectory, _hostInfo);
 
+        /// <summary>
+        /// 停掉所有已启动模块，清空模块表，重新走一遍"发现 → 解析 → 加载 → 启动"。
+        /// 安装或卸载框架后用它刷新。
+        ///
+        /// 注意：.NET Framework 里程序集一旦加载就卸不掉，所以"卸载"不会让已加载的类型消失，
+        /// 只有重启进程才彻底干净 —— 这一点在卸载提示里如实告诉用户。
+        /// </summary>
+        public ModuleLoadReport ReloadAll()
+        {
+            _log.Info("重新加载模块表");
+            StopModules();
+            _entries.Clear();
+            return Run();
+        }
+
         /// <summary>加载结束时按模块目录里的私有 dll 解析依赖，避免每个模块都要往宿主根丢文件。</summary>
         private Assembly ResolveModuleDependency(object sender, ResolveEventArgs args)
         {

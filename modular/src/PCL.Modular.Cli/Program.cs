@@ -15,6 +15,10 @@ namespace PCL.Modular.Cli
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             var modulesDirectory = Directory.GetCurrentDirectory();
             var faultInjection = false;
+            var packageSelfTest = false;
+            var overwrite = false;
+            string installPath = null, uninstallId = null;
+            var listOnly = false;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -26,6 +30,21 @@ namespace PCL.Modular.Cli
                     case "--inject-fault":
                         faultInjection = true;
                         break;
+                    case "--package-selftest":
+                        packageSelfTest = true;
+                        break;
+                    case "--install":
+                        if (i + 1 < args.Length) installPath = args[++i];
+                        break;
+                    case "--overwrite":
+                        overwrite = true;
+                        break;
+                    case "--list":
+                        listOnly = true;
+                        break;
+                    case "--uninstall":
+                        if (i + 1 < args.Length) uninstallId = args[++i];
+                        break;
                     case "--help":
                     case "-h":
                         PrintHelp();
@@ -36,9 +55,12 @@ namespace PCL.Modular.Cli
                 }
             }
 
-            return faultInjection
-                ? FaultInjectionSuite.Run()
-                : RunModules(modulesDirectory);
+            if (faultInjection) return FaultInjectionSuite.Run();
+            if (packageSelfTest) return PackageCommands.SelfTest();
+            if (installPath != null) return PackageCommands.Install(modulesDirectory, installPath, overwrite);
+            if (listOnly) return PackageCommands.List(modulesDirectory);
+            if (uninstallId != null) return PackageCommands.Uninstall(modulesDirectory, uninstallId);
+            return RunModules(modulesDirectory);
         }
 
         private static void PrintHelp()
@@ -47,6 +69,10 @@ namespace PCL.Modular.Cli
             Console.WriteLine("  PCL.Modular.Cli [模块目录]            加载并打印模块表（默认 ./modules）");
             Console.WriteLine("  PCL.Modular.Cli --modules <目录>      同上，显式指定目录");
             Console.WriteLine("  PCL.Modular.Cli --inject-fault        跑故障注入用例，验证加载器能识别各类坏模块");
+            Console.WriteLine("  PCL.Modular.Cli --modules <目录> --install <包> [--overwrite]   安装功能框架包");
+            Console.WriteLine("  PCL.Modular.Cli --modules <目录> --list                         列出已装框架");
+            Console.WriteLine("  PCL.Modular.Cli --modules <目录> --uninstall <id>                卸载框架");
+            Console.WriteLine("  PCL.Modular.Cli --package-selftest    跑安装器故障注入（坏包、zip slip、覆盖、回滚）");
             Console.WriteLine("退出码：0 健康 / 1 有失败或跳过 / 2 一个模块都没发现");
         }
 

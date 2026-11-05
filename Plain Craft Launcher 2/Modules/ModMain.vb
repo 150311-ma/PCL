@@ -835,7 +835,6 @@ NextFile:
         Text = Text.Replace("{pcl_version_branch}", Replacer(BuildTypeDisplay))
         Text = Text.Replace("{pcl_build_type}", Replacer(BuildType.ToString))
         Text = Text.Replace("{pcl_branch}", Replacer(VersionBranchMain))
-        Text = Text.Replace("{identify}", Replacer(Identify))
         Text = Text.Replace("{path}", Replacer(Paths.Base))
         Text = Text.Replace("{path_with_name}", Replacer(PathExe))
         Text = Text.Replace("{path_temp}", Replacer(PathTemp))

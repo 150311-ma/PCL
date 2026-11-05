@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>PCL.Demo.Hello</RootNamespace>
+    <AssemblyName>PCL.Demo.Hello</AssemblyName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="module.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

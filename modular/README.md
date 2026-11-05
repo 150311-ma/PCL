@@ -50,13 +50,13 @@ UI 模块在独立仓库里，见 `ARCHITECTURE.md` 的仓库表。
 
 ## 四、跑起来是什么样
 
-壳程序本身没有任何业务代码，界面上的东西全部来自模块：
+整个程序**只有一页**：拖包 → 装 → 立刻可用。左边是刚启动的样子，右边是拖进示例框架之后的样子。
 
-| 默认主题 | 切换到紫罗兰 |
+| 刚装好 | 拖进示例框架后 |
 | --- | --- |
-| ![默认主题](docs/shell-blue.png) | ![紫罗兰](docs/shell-violet.png) |
+| ![首页](docs/home-default.png) | ![已装](docs/home-installed.png) |
 
-两张图是同一份代码离屏渲染出来的（`--render`），颜色差异来自 `pcl.theme` 真的改了资源字典。
+两张图都是同一份代码离屏渲染出来的（`--render`），不是画的效果图。
 
 ## 五、构建与验证
 ```bat
@@ -126,3 +126,83 @@ src\PCL.Shell\bin\Debug\PCL.Shell.exe --render preview.png --theme violet
 
 ![本体运行](docs/pcl-running.png)
 
+## 八、单页 + 功能框架包（2026-11-05 追加）
+
+### 只有一页
+
+壳里没有导航、没有侧边栏、没有设置页。页面上只有三件事：
+**拖放区**（拖 .pclpkg 进来）、**已装框架列表**、**状态栏**。
+所有能力都来自 `modules/`，壳自己不含任何业务逻辑。
+
+### 包格式 `.pclpkg`
+
+就是一个 zip，根目录放 `module.json`（允许套一层文件夹）：
+
+```
+module.json          # id / name / version / assembly / entry / dependencies
+PCL.Xxx.dll          # 模块本体
+（可选）其它依赖 dll
+```
+
+打包用 `tools/pack_module.py <构建输出目录> <输出.pclpkg>`，只收白名单扩展名，不会把 pdb、日志混进去。
+
+### 安装流程（`PCL.Modular.Packages`）
+
+顺序是刻意的——**所有校验都在动盘之前，所有写入都在 staging 里，最后一步才原子提交**：
+
+| 步骤 | 做什么 | 失败时 |
+| --- | --- | --- |
+| 1 检查 | 读清单、查路径穿越、条目数与解压体积、程序集是否存在、依赖是否已装、宿主版本 | 直接拒绝，磁盘不变 |
+| 2 解压 | 解到 `modules/.staging/<id>-<随机>` | 清掉 staging |
+| 3 记录 | 写 `install.json`（来源、sha256、时间） | 清掉 staging |
+| 4 备份 | 已存在同 Id 且用户确认覆盖时，旧目录挪到 `modules/.backup/` | —— |
+| 5 提交 | `Directory.Move` 原子改名到 `modules/<id>/` | 自动把备份挪回原位 |
+| 6 生效 | 调用 `ModuleHost.ReloadAll()` 重新走一遍加载 | 新框架标记失败并报原因 |
+
+卸载不会假装"删干净"：它只把目录挪进 `modules/.trash/`。.NET Framework 里已加载的程序集卸不掉，
+**如实告诉用户"重启后彻底生效"**，比骗自己强。
+
+### 验证
+
+```bat
+:: 安装器故障注入：坏包 / zip slip / 缺依赖 / 缺程序集 / 重复安装 / 覆盖 / 卸载
+PCL.Modular.Cli.exe --package-selftest      → 13/13 通过
+
+:: 真装一个
+PCL.Modular.Cli.exe --modules <目录> --install dist\PCL.Demo.Hello-1.0.0.pclpkg
+PCL.Modular.Cli.exe --modules <目录>                 → 4 个模块，全部运行中
+```
+
+### 液态玻璃的来路
+
+视觉方案参考了两个 GitHub 项目，最后选的是后者的路子：
+
+- [trrahul/glassmorphism-wpf](https://github.com/trrahul/glassmorphism-wpf) —— 三种实现对比（SkiaSharp 实时采样 / 基础 Skia / 纯 XAML）。
+  本项目用的是它 **GlassmorphismXaml** 那一路：`BlurEffect` 光斑 + 半透明层 + 边缘高光。
+- [TianXiaTech/BlurWindow](https://github.com/TianXiaTech/BlurWindow) —— 用 `SetWindowCompositionAttribute` 让窗口真的透出桌面。
+  **没用它**：Win11 22H2 之后行为不稳定，失败时整窗发黑。宁可稳，不要赌。
+
+所以"玻璃"是自己画出来的：背景三颗大模糊光斑 + 半透明白面板 + 1px 白色高光边 + 柔和外阴影，
+外加 Win11 原生圆角（`DWMWA_WINDOW_CORNER_PREFERENCE`）。不依赖系统合成器，任何机器看起来一致。
+
+## 九、本体清理（把原作者那套东西摘掉）
+
+`tools/strip_donation.py` 逐处精确替换，**任何一处没命中就整体报错**，不会留下半截代码。删掉的东西：
+
+| 位置 | 删除内容 |
+| --- | --- |
+| `Modules/ModSecret.vb` | 整个「赞助等级」区：`CurrentRank` / `InputPotatoCode` / `GeneratePotatoCode` / `GetIdentify` |
+| `Modules/Base/ModBase.vb` | `Identify` 字段（对外可兑换的识别码） |
+| `FormMain.xaml.vb` | 启动上报 `Telemetry`、「开源版本说明」弹窗、快照版赞助者说明、99 次解锁提示 |
+| `Modules/Minecraft/ModLaunch.vb` | 启动次数达标时的求赞助弹窗 |
+| `Pages/PageOther/PageOtherAbout.xaml` | 「赞助者」整张卡片（数百条名单 + 生成/输入土豆码/复制识别码/赞助作者四个按钮）、「赞助 PCL!」「赞助镜像源」按钮 |
+| `Pages/PageSetup/PageSetupSystem.xaml` | 「复制识别码 / 输入土豆码」整行 |
+| `Pages/PageSetup/PageSetupUI.xaml` | 「赞助解锁主题」横幅、土豆码解锁提示 |
+| `Pages/PageLaunch/PageLaunchRight.xaml` | 快照版赞助者提示条 |
+| `Application.xaml.vb` | 启动日志里打印识别码 |
+
+**保留**的一处：设置加密与联机主机名原本用识别码当盐，现在改成 `DeviceSalt`（本地常量，不展示、不绑定账号、
+换不到任何东西）。不留这个盐，老设置解不开、联机主机名也对不上——这是把它降级成本地技术细节，而不是继续当身份凭证。
+
+验证：`dotnet build "Plain Craft Launcher 2.sln"` → **0 警告 0 错误**；源码里已无
+`CurrentRank / DonationRank / InputPotatoCode / GetIdentify / 土豆码 / 赞助` 的引用。

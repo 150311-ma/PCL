@@ -61,9 +61,10 @@ Public Module ModBase
     ''' </summary>
     Public ApplicationOpenTime As Date = Date.Now
     ''' <summary>
-    ''' 识别码。
+    ''' 本地盐值：只用于设置加密与联机主机名，不对外展示、不绑定任何账号、也换不到任何东西。
+    ''' 保留旧值是为了让已经加密过的设置还能解开。
     ''' </summary>
-    Public Identify As String = GetIdentify()
+    Public ReadOnly DeviceSalt As String = "0000-0000-0000-0000"
     ''' <summary>
     ''' 程序是否正在结束。
     ''' </summary>

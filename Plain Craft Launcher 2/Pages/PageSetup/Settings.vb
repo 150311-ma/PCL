@@ -252,7 +252,7 @@ Public Class Settings
             If Encrypted Then
                 Try
                     If Value Is Nothing Then Value = ""
-                    Value = DesEncrypt(Value, "PCL" & Identify)
+                    Value = DesEncrypt(Value, "PCL" & DeviceSalt)
                 Catch ex As Exception
                     Logger.Warn(ex, $"加密设置失败：{Key}")
                 End Try
@@ -326,7 +326,7 @@ Public Class Settings
         '正常读取
         Try
             Dim GotValue As String = Nothing '先用 String 储存，避免类型转换
-            Dim DefaultValue As String = If(Entry.Encrypted, DesEncrypt(Entry.DefaultValue, "PCL" & Identify), Entry.DefaultValue)
+            Dim DefaultValue As String = If(Entry.Encrypted, DesEncrypt(Entry.DefaultValue, "PCL" & DeviceSalt), Entry.DefaultValue)
             Select Case Entry.Source
                 Case Sources.Normal
                     GotValue = ReadIni("Setup", Key, DefaultValue)
@@ -344,7 +344,7 @@ Public Class Settings
                     GotValue = Entry.DefaultValue
                 Else
                     Try
-                        GotValue = DesDecrypt(GotValue, "PCL" & Identify)
+                        GotValue = DesDecrypt(GotValue, "PCL" & DeviceSalt)
                     Catch ex As Exception
                         Logger.Warn(ex, $"解密设置失败：{Key}")
                         GotValue = Entry.DefaultValue

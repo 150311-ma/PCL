@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj" />
     <ProjectReference Include="..\PCL.Modular.Host\PCL.Modular.Host.csproj" />
+    <ProjectReference Include="..\PCL.Modular.Packages\PCL.Modular.Packages.csproj" />
     <!-- 只保证先构建模块，不产生编译期引用：壳永远不直接 new 模块里的类型 -->
     <ProjectReference Include="..\PCL.Core\PCL.Core.vbproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\PCL.Theme\PCL.Theme.vbproj" ReferenceOutputAssembly="false" Private="false" />

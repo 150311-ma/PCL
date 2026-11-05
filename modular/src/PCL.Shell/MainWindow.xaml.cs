@@ -1,195 +1,263 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using PCL.Modular.Abstractions;
 using PCL.Modular.Contracts;
 using PCL.Modular.Host;
+using PCL.Modular.Packages;
 
 namespace PCL.Shell
 {
+    /// <summary>
+    /// 唯一的一页：拖包 → 装 → 立刻可用。
+    ///
+    /// 界面之外没有第二个页面、没有侧边栏、没有设置页。
+    /// 能力全部来自 modules 目录，壳只负责"装载、展示、装包、卸载"。
+    /// </summary>
     public partial class MainWindow : Window
     {
         private readonly ModuleHost _host;
+        private readonly PackageInstaller _installer;
         private readonly IThemeService _theme;
-        private readonly IMicrosoftAuthService _msAuth;
+        private readonly ObservableCollection<FrameworkCard> _cards = new ObservableCollection<FrameworkCard>();
+        private ModuleLoadReport _report;
 
         public MainWindow(ModuleHost host, ModuleLoadReport report)
         {
             _host = host;
+            _report = report;
             InitializeComponent();
 
+            _installer = new PackageInstaller(host.ModulesDirectory, host.Log);
             host.Services.TryGet(out _theme);
-            host.Services.TryGet(out _msAuth);
 
-            FillModules(report);
-            FillThemes();
-            ShowMsState();
+            ListModules.ItemsSource = _cards;
+            LabVersion.Text = host.Host.Version;
+            RefreshModules();
 
-            LabFooter.Text = "日志 logs\\modules.log　·　模块目录 modules\\　·　壳程序不含任何业务代码，功能全部来自 modules 下的模块";
-
-            if (GridModules.Items.Count > 0) GridModules.SelectedIndex = 0;
+            Loaded += (s, e) => GlassHelper.TryEnableRoundedCorners(this);
         }
 
-        // ── 模块表 ──────────────────────────────────────────────────────────
+        // ── 列表 ────────────────────────────────────────────────────────────
 
-        private void FillModules(ModuleLoadReport report)
+        private void RefreshModules()
         {
-            GridModules.ItemsSource = report.Entries.Select(entry => new ModuleRow
-            {
-                Name = entry.Manifest?.DisplayName ?? "?",
-                Id = entry.Id,
-                Version = entry.Manifest?.Version ?? "-",
-                State = StateText(entry.State),
-                Elapsed = entry.LoadMilliseconds + entry.StartMilliseconds + " ms",
-                Detail = entry.Error == null
-                    ? entry.Manifest?.Description ?? ""
-                    : "加载异常：" + entry.Error
-            }).ToList();
+            _cards.Clear();
+            var installed = _installer.ListInstalled().ToDictionary(m => m.Id, m => m, StringComparer.OrdinalIgnoreCase);
 
-            LabSummary.Text = $"已启动 {report.StartedCount} · 失败 {report.FailedCount} · 跳过 {report.SkippedCount}";
-            LabSummary.Foreground = report.IsHealthy
-                ? (Brush)FindResource("ColorBrushGray3")
-                : new SolidColorBrush(Color.FromRgb(0xC0, 0x39, 0x2B));
+            foreach (var entry in _report.Entries.OrderBy(e => e.Id, StringComparer.OrdinalIgnoreCase))
+            {
+                installed.TryGetValue(entry.Id, out var record);
+                _cards.Add(new FrameworkCard
+                {
+                    Id = entry.Id,
+                    Name = entry.Manifest?.DisplayName ?? record?.Name ?? entry.Id,
+                    Version = entry.Manifest?.Version ?? record?.Version ?? "?",
+                    State = StateText(entry.State),
+                    Detail = entry.Error ?? entry.Manifest?.Description ?? "由内置模块提供",
+                    Initial = Initial(entry.Id),
+                    CanUninstall = !string.Equals(entry.Id, "pcl.core", StringComparison.OrdinalIgnoreCase)
+                });
+            }
+
+            LabCount.Text = $"{_report.StartedCount} 个运行中 / 共 {_report.Entries.Count} 个";
+            LabEmpty.Visibility = _cards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            LabFooter.Text = "模块目录 modules\\　·　日志 logs\\modules.log";
         }
 
-        private static string StateText(PCL.Modular.Abstractions.ModuleState state)
+        /// <summary>用模块 Id 的最后一段取首字母：pcl.core → C，pcl.theme → T，比一排 P 好认。</summary>
+        private static string Initial(string moduleId)
+        {
+            if (string.IsNullOrWhiteSpace(moduleId)) return "?";
+            var tail = moduleId.Split('.').LastOrDefault() ?? moduleId;
+            var first = tail.Trim().FirstOrDefault();
+            return char.IsLetter(first) ? char.ToUpperInvariant(first).ToString() : "P";
+        }
+
+        private static string StateText(ModuleState state)
         {
             switch (state)
             {
-                case PCL.Modular.Abstractions.ModuleState.Started: return "运行中";
-                case PCL.Modular.Abstractions.ModuleState.Loaded: return "已加载";
-                case PCL.Modular.Abstractions.ModuleState.Stopped: return "已停止";
-                case PCL.Modular.Abstractions.ModuleState.Skipped: return "已跳过";
-                case PCL.Modular.Abstractions.ModuleState.Failed: return "失败";
+                case ModuleState.Started: return "运行中";
+                case ModuleState.Loaded: return "已加载";
+                case ModuleState.Stopped: return "已停止";
+                case ModuleState.Skipped: return "已跳过";
+                case ModuleState.Failed: return "失败";
                 default: return state.ToString();
             }
         }
 
-        private void GridModules_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void SetStatus(string message, bool isError = false)
         {
-            if (!(GridModules.SelectedItem is ModuleRow row))
+            LabStatus.Text = message;
+            LabStatus.Foreground = isError
+                ? new SolidColorBrush(Color.FromRgb(0xC0, 0x39, 0x2B))
+                : new SolidColorBrush(Color.FromRgb(0x4A, 0x55, 0x63));
+        }
+
+        // ── 拖放 ────────────────────────────────────────────────────────────
+
+        private static bool IsPackage(DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return false;
+            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            return files != null && files.Length == 1 && IsPackagePath(files[0]);
+        }
+
+        private static bool IsPackagePath(string path)
+        {
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            return extension == ".pclpkg" || extension == ".zip";
+        }
+
+        private void Window_DragOver(object sender, DragEventArgs e)
+        {
+            var accepted = IsPackage(e);
+            e.Effects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+
+            DropFrame.Stroke = accepted
+                ? (Brush)FindResource("ColorBrush3")
+                : new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
+            DropFrame.StrokeThickness = accepted ? 2.2 : 1.6;
+            DropFrame.Fill = new SolidColorBrush(Color.FromArgb(accepted ? (byte)0x66 : (byte)0x33, 0xFF, 0xFF, 0xFF));
+            LabDropTitle.Text = accepted ? "松手就装" : "只接受 .pclpkg / .zip";
+        }
+
+        private void Window_DragLeave(object sender, DragEventArgs e) => ResetDropZone();
+
+        private void Window_Drop(object sender, DragEventArgs e)
+        {
+            ResetDropZone();
+            if (!IsPackage(e)) return;
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            InstallPackage(files[0]);
+        }
+
+        private void ResetDropZone()
+        {
+            DropFrame.Stroke = new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
+            DropFrame.StrokeThickness = 1.6;
+            DropFrame.Fill = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
+            LabDropTitle.Text = "拖入 .pclpkg 文件";
+        }
+
+        // ── 安装 ────────────────────────────────────────────────────────────
+
+        private void BtnChoose_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                LabDetail.Text = "";
+                Title = "选择功能框架包",
+                Filter = "功能框架包 (*.pclpkg;*.zip)|*.pclpkg;*.zip|所有文件 (*.*)|*.*",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) == true) InstallPackage(dialog.FileName);
+        }
+
+        private void InstallPackage(string path)
+        {
+            // 1. 先只读检查，问题在动盘之前就说清楚
+            var inspection = _installer.Inspect(path);
+            if (!inspection.IsValid)
+            {
+                SetStatus("装不了：" + string.Join("；", inspection.Errors.Take(2)), true);
                 return;
             }
-            LabDetail.Text = $"{row.Name}　{row.Id}@{row.Version}　[{row.State}]　{row.Elapsed}\n" +
-                             (string.IsNullOrWhiteSpace(row.Detail) ? "该模块没有提供说明。" : row.Detail);
-        }
 
-        // ── 主题 ────────────────────────────────────────────────────────────
-
-        private void FillThemes()
-        {
-            if (_theme == null)
+            // 2. 已存在就明确问一次，绝不悄悄覆盖
+            var target = Path.Combine(_installer.ModulesDirectory, inspection.Manifest.Id);
+            var overwrite = false;
+            if (Directory.Exists(target))
             {
-                ComboTheme.IsEnabled = false;
-                LabTheme.Text = "主题模块未加载（检查 modules/pcl.theme）";
-                return;
-            }
-
-            ComboTheme.ItemsSource = _theme.Themes;
-            ComboTheme.DisplayMemberPath = "Name";
-            ComboTheme.SelectedItem = _theme.Themes.FirstOrDefault(t => t.Id == _theme.Current.Id);
-            RefreshThemeSurface();
-        }
-
-        private void ComboTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_theme == null || !(ComboTheme.SelectedItem is ThemeInfo theme)) return;
-            if (!_theme.Apply(theme.Id)) return;
-            RefreshThemeSurface();
-        }
-
-        private void RefreshThemeSurface()
-        {
-            if (_theme == null) return;
-
-            LabTheme.Text = $"{_theme.Current.Name}　色相 {_theme.Current.Hue}　饱和度 {_theme.Current.Saturation}　亮度偏移 {_theme.Current.LightAdjust}";
-
-            var stops = _theme.GetTopbarGradient();
-            if (stops == null || stops.Count == 0) return;
-            var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
-            foreach (var stop in stops)
-            {
-                brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(stop.Color), stop.Offset));
-            }
-            PanTitle.Background = brush;
-        }
-
-        // ── 微软登录 ────────────────────────────────────────────────────────
-
-        private void ShowMsState()
-        {
-            if (_msAuth == null)
-            {
-                LabMsState.Text = "微软登录模块未加载";
-                BtnLogin.IsEnabled = false;
-                return;
-            }
-
-            if (!_msAuth.IsConfigured)
-            {
-                LabMsState.Text = "未配置 ClientId";
-                LabMsHint.Text = "开源版不含内置 ClientId：设置环境变量 PCL_MS_CLIENT_ID 后重启壳程序，按钮才会真正发起登录。";
-                BtnLogin.IsEnabled = true; // 允许点，以便验证错误提示本身是对的
-                return;
-            }
-
-            var cached = _msAuth.CachedAccount;
-            LabMsState.Text = cached == null ? "当前没有已登录账号" : $"已登录：{cached.Name}";
-            LabMsHint.Text = cached == null ? "" : $"令牌有效期至 {cached.ExpiresAt.LocalDateTime:yyyy-MM-dd HH:mm}";
-        }
-
-        private async void BtnLogin_Click(object sender, RoutedEventArgs e)
-        {
-            if (_msAuth == null) return;
-
-            BtnLogin.IsEnabled = false;
-            LabUserCode.Text = "";
-            try
-            {
-                if (!_msAuth.IsConfigured)
+                var answer = MessageBox.Show(this,
+                    $"已经装过 {inspection.Manifest.DisplayName} 了。\n" +
+                    $"用包里的 {inspection.Manifest.Version} 覆盖它吗？\n" +
+                    "旧版本会保留在 modules\\.backup，装坏了能拿回来。",
+                    "确认覆盖", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                if (answer != MessageBoxResult.OK)
                 {
-                    LabMsState.Text = "无法登录：未配置 ClientId";
-                    LabMsHint.Text = "这是预期行为——开源版不含 ClientId。设置环境变量 PCL_MS_CLIENT_ID 后重启即可。";
+                    SetStatus("已取消覆盖安装");
                     return;
                 }
-
-                LabMsState.Text = "正在申请设备码…";
-                var deviceCode = await _msAuth.RequestDeviceCodeAsync(CancellationToken.None);
-                LabUserCode.Text = deviceCode.UserCode;
-                LabMsState.Text = $"请在浏览器打开 {deviceCode.VerificationUri}";
-                LabMsHint.Text = "等待授权中…授权完成后窗口会自动继续。";
-
-                var progress = new Progress<string>(text => LabMsHint.Text = text);
-                var account = await _msAuth.CompleteLoginAsync(deviceCode, progress, CancellationToken.None);
-
-                LabMsState.Text = $"登录成功：{account.Name}";
-                LabMsHint.Text = $"UUID {account.Uuid}　令牌有效期至 {account.ExpiresAt.LocalDateTime:yyyy-MM-dd HH:mm}";
-                LabUserCode.Text = "";
+                overwrite = true;
             }
-            catch (Exception ex)
+
+            SetStatus($"正在安装 {inspection.Manifest.DisplayName}…");
+
+            // 3. 提交
+            var result = _installer.Install(path, overwrite);
+            if (!result.Success)
             {
-                LabMsState.Text = "登录失败";
-                LabMsHint.Text = ex.Message;
+                SetStatus(result.Message, true);
+                return;
             }
-            finally
-            {
-                BtnLogin.IsEnabled = true;
-            }
+
+            // 4. 重载模块表，让新框架立刻可用
+            _report = _host.ReloadAll();
+            RefreshModules();
+
+            var loaded = _report.Entries.FirstOrDefault(m => string.Equals(m.Id, result.ModuleId, StringComparison.OrdinalIgnoreCase));
+            if (loaded != null && loaded.State == ModuleState.Started)
+                SetStatus($"{result.Message}，已生效。");
+            else if (loaded != null)
+                SetStatus($"{result.Message}，但加载失败：{loaded.Error}", true);
+            else
+                SetStatus($"{result.Message}。");
         }
 
-        private sealed class ModuleRow
+        // ── 卸载 ────────────────────────────────────────────────────────────
+
+        private void BtnUninstall_Click(object sender, RoutedEventArgs e)
         {
-            public string Name { get; set; }
+            if (!(sender is FrameworkElement element) || !(element.Tag is string moduleId)) return;
+
+            var answer = MessageBox.Show(this,
+                $"确定卸载 {moduleId} 吗？\n\n" +
+                "卸载会把它移出模块目录；已经加载进内存的那一份要等重启才彻底消失。",
+                "卸载功能框架", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.OK) return;
+
+            if (!_installer.Uninstall(moduleId, out var message))
+            {
+                SetStatus(message, true);
+                return;
+            }
+
+            _report = _host.ReloadAll();
+            RefreshModules();
+            SetStatus($"{moduleId} 已卸载。{message}");
+        }
+
+        // ── 窗口 ────────────────────────────────────────────────────────────
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                return;
+            }
+            if (e.ButtonState == MouseButtonState.Pressed) DragMove();
+        }
+
+        private void BtnMin_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        public sealed class FrameworkCard
+        {
             public string Id { get; set; }
+            public string Name { get; set; }
             public string Version { get; set; }
             public string State { get; set; }
-            public string Elapsed { get; set; }
             public string Detail { get; set; }
+            public string Initial { get; set; }
+            public bool CanUninstall { get; set; }
         }
     }
 }
