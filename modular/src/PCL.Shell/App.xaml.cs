@@ -37,6 +37,36 @@ namespace PCL.Shell
 
             var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
+            // 命令行跑构建脚本：界面之外也能验"拖进来会怎样"
+            var buildIndex = Array.IndexOf(e.Args, "--build");
+            if (buildIndex >= 0 && buildIndex + 1 < e.Args.Length)
+            {
+                var buildLog = Path.Combine(baseDirectory, "logs", "build.log");
+                var logger = new PCL.Modular.Host.ModuleLogger("build", buildLog, false);
+                var builder = new ScriptBuilder(baseDirectory, logger);
+                var lines = new System.Collections.Generic.List<string>();
+                // 这里 _host 还没建出来（这一步在宿主初始化之前），只能用最土的方式记日志
+                var result = builder.Run(e.Args[buildIndex + 1], line => lines.Add(line));
+                lines.Add("");
+                lines.Add("── 结果 ──");
+                lines.Add(result.Message);
+                lines.Add("退出码=" + result.ExitCode + " 产物=" + (result.PackagePath ?? "无"));
+
+                // WinExe 没有控制台，结果只能落文件
+                try
+                {
+                    var folder = Path.Combine(baseDirectory, "logs");
+                    Directory.CreateDirectory(folder);
+                    File.WriteAllText(Path.Combine(folder, "last-build.log"), string.Join(Environment.NewLine, lines));
+                }
+                catch
+                {
+                    // 写不了就算了
+                }
+                Shutdown(result.Success ? 0 : 2);
+                return;
+            }
+
             // 命令行自检：提示词能不能取到、能不能进剪贴板（界面之外也能验）
             if (Array.IndexOf(e.Args, "--copy-prompt") >= 0)
             {

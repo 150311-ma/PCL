@@ -203,10 +203,30 @@ namespace PCL.Shell
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
                 Title = "挑一个框架包",
-                Filter = "框架包 (*.pclpkg;*.zip)|*.pclpkg;*.zip|所有文件 (*.*)|*.*",
+                Filter = "框架包或构建脚本 (*.pclpkg;*.zip;*.py;*.js;*.ps1;*.bat)|*.pclpkg;*.zip;*.py;*.js;*.ps1;*.bat|所有文件 (*.*)|*.*",
                 CheckFileExists = true
             };
             if (dialog.ShowDialog(this) == true) InstallPackage(dialog.FileName);
+        }
+
+        // ── 构建脚本：拖进来直接跑，跑完装上 ────────────────────────────────
+
+        private void RunBuildScript(string scriptPath)
+        {
+            var builder = new ScriptBuilder(AppDomain.CurrentDomain.BaseDirectory, _host.Log);
+            ScriptBuilder.Result last = null;
+
+            var window = new BuildWindow(builder, scriptPath, result => last = result) { Owner = this };
+            window.InstallRequested += (s, e) =>
+            {
+                if (last?.PackagePath == null) return;
+                window.Close();
+                InstallPackage(last.PackagePath);
+            };
+            window.ShowDialog();
+
+            if (last != null && !last.Success)
+                SetStatus(last.Message, true);
         }
 
         // ── 制作：复制提示词 + 打开 DeepSeek ────────────────────────────────
@@ -257,11 +277,12 @@ namespace PCL.Shell
 
         // ── 拖放 ────────────────────────────────────────────────────────────
 
-        private static bool IsPackage(DragEventArgs e)
+        private static string DroppedFile(DragEventArgs e)
         {
-            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return false;
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
             var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-            return files != null && files.Length == 1 && IsPackagePath(files[0]);
+            if (files == null || files.Length != 1) return null;
+            return IsPackagePath(files[0]) || IsScriptPath(files[0]) ? files[0] : null;
         }
 
         private static bool IsPackagePath(string path)
@@ -270,9 +291,22 @@ namespace PCL.Shell
             return extension == ".pclpkg" || extension == ".zip";
         }
 
+        /// <summary>构建脚本：拖进来直接跑，跑完把产物装上。</summary>
+        private static readonly string[] ScriptExtensions =
+        {
+            ".py", ".js", ".mjs", ".ps1", ".bat", ".cmd", ".lua", ".rb", ".sh"
+        };
+
+        private static bool IsScriptPath(string path)
+        {
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            return Array.IndexOf(ScriptExtensions, extension) >= 0;
+        }
+
         private void Window_DragOver(object sender, DragEventArgs e)
         {
-            var accepted = IsPackage(e);
+            var dropped = DroppedFile(e);
+            var accepted = dropped != null;
             e.Effects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
             e.Handled = true;
 
@@ -281,17 +315,21 @@ namespace PCL.Shell
                 : new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
             DropFrame.StrokeThickness = accepted ? 2.2 : 1.6;
             DropFrame.Fill = new SolidColorBrush(Color.FromArgb(accepted ? (byte)0x66 : (byte)0x33, 0xFF, 0xFF, 0xFF));
-            LabDropTitle.Text = accepted ? "松手就装" : "只认 .pclpkg";
+            LabDropTitle.Text = accepted
+                ? (IsScriptPath(dropped) ? "松手就构建" : "松手就装")
+                : "只认 .pclpkg 和脚本";
         }
 
         private void Window_DragLeave(object sender, DragEventArgs e) => ResetDropZone();
 
         private void Window_Drop(object sender, DragEventArgs e)
         {
+            var dropped = DroppedFile(e);
             ResetDropZone();
-            if (!IsPackage(e)) return;
-            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            InstallPackage(files[0]);
+            if (dropped == null) return;
+
+            if (IsScriptPath(dropped)) RunBuildScript(dropped);
+            else InstallPackage(dropped);
         }
 
         private void ResetDropZone()
@@ -299,7 +337,7 @@ namespace PCL.Shell
             DropFrame.Stroke = new SolidColorBrush(Color.FromRgb(0x8F, 0xA9, 0xC6));
             DropFrame.StrokeThickness = 1.6;
             DropFrame.Fill = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
-            LabDropTitle.Text = "拖一个 .pclpkg 进来";
+            LabDropTitle.Text = "拖一个 .pclpkg 或构建脚本进来";
         }
 
         // ── 安装 / 卸载 ─────────────────────────────────────────────────────

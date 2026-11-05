@@ -55,6 +55,33 @@ zip 里就是这个形状，不要多套一层，不要带 pdb、obj、bin。
 - 需要配置就通过 `context.Services` 取 `PCL.Modular.Contracts.ISettingsService`，不要自己读写文件。
 - 不要碰宿主内部类型，不要反射，不要联网下载可执行文件，不要起后台常驻线程（真要起就在 OnStop 里停掉）。
 
+## 契约里真实存在的成员（照抄，不要猜）
+
+宿主只提供这些，写错就是 `CS1061`，编译直接失败：
+
+```csharp
+// IModuleContext（OnLoad 的参数）
+context.Log.Info("...");                    // 也有 Warn / Error(msg, ex) / Debug
+context.DataDirectory                        // 这个框架自己的数据目录（可写）
+context.Host.BaseDirectory                   // PCV 安装目录（只读用途）
+context.Manifest.DisplayName                 // 自己在清单里的名字
+
+// 取服务：只有 TryGet / Get，没有 GetService
+ISettingsService settings = null;
+context.Services.TryGet(out settings);       // ✅
+// ❌ context.Services.GetService(typeof(ISettingsService))
+
+// 读写配置：方法名带 Value
+string value = settings.GetValue("mc.version", "1.20.1");   // ✅
+// ❌ settings.Get("mc.version")
+settings.SetValue("mc.version", value);                     // ✅
+// ❌ settings.Set("mc.version", value)
+settings.Save();
+```
+
+**不要**自己发明 `GetService`、`Get`、`Set`、`Resolve`、`ServiceLocator` 这类名字 —— 宿主没有这些方法。
+拿不准就不要用服务，直接用 `context.DataDirectory` 读写文件也行。
+
 ## 照着这个骨架写（结构别改，只替换 TODO）
 
 ```python
@@ -152,6 +179,8 @@ finally:
 ```
 
 ## 最后自检（脚本里不用写，但你自己要过一遍）
+
+0. 代码里**没有** `GetService` / `.Get(` / `.Set(` —— 只有 `TryGet` / `GetValue` / `SetValue`。
 
 1. `id` 带 `pcv.` 前缀，全小写；`assembly` 和 `entry` 与代码完全对应。
 2. 只引用 `PCL.Modular.Abstractions.dll`，`Private=false`。
