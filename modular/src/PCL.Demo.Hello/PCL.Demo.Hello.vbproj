@@ -10,7 +10,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj" />
+    <ProjectReference Include="..\PCL.Modular.Abstractions\PCL.Modular.Abstractions.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- 模块不直接用到 Newtonsoft；不让它被复制进包，包才是几十 KB 而不是 700 KB -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

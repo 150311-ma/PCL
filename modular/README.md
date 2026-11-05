@@ -47,6 +47,10 @@ modular/
 | `pcl.core` | PCL.Core.vbproj | — | `Modules/Base`（路径、MyColor）、`Settings` | ✅ 可编译可加载 |
 | `pcl.theme` | PCL.Theme.vbproj | pcl.core | `ModSecret` 主题区域 + `Application.xaml` 颜色表 | ✅ 可编译可加载 |
 | `pcl.launch.microsoft` | PCL.Launch.Microsoft.vbproj | pcl.core | `ModLaunch.McLoginMsStart` / `MsLoginStep1~6` | ✅ 可编译可加载 |
+| `pcv.diagnostics` | Pcv.Diagnostics.csproj | pcl.core | 新增 | ✅ 可编译可加载 |
+| `pcv.stat` | Pcv.Stat.csproj | pcl.core | 新增 | ✅ 可编译可加载 |
+| `pcv.cleaner` | Pcv.Cleaner.csproj | pcl.core | 新增 | ✅ 可编译可加载 |
+| `pcl.demo.hello` | PCL.Demo.Hello.vbproj | pcl.core | 示例 | ✅ 可编译可加载 |
 | `pcl.ui.*` | 各自独立仓库 | pcl.core / pcl.theme / pcl.ui.controls | `Pages/*`、`Controls/` | 🚧 源码已归位，适配中 |
 
 UI 模块在独立仓库里，见 `ARCHITECTURE.md` 的仓库表。
@@ -246,3 +250,24 @@ AI 只要替换内容就行，不用它自己发明结构。契约程序集路�
 这台机器上 `Clipboard.SetDataObject` 一直抛 `CLIPBRD_E_CANT_OPEN`（重试 8 次也不行），
 换成 Win32 的 `OpenClipboard` / `SetClipboardData` 一次就过。代码在 `ClipboardWriter.cs`，
 注释里写了原因——免得以后有人"顺手改回 WPF 的写法"。
+
+## 十一、三个现成的小框架（2026-11-05 追加）
+
+自己动手做的三个包，都能直接用，源码在 `src/Pcv.*`，成品在 `dist/`：
+
+| 包 | 干什么 | 装完能看到什么 |
+| --- | --- | --- |
+| `pcv.diagnostics` 环境自检 | 系统版本、CLR、位数、磁盘余量、模块目录是否可写、装了几个包、配置几条 | `logs\diagnostics-<时间>.txt` 一份报告 |
+| `pcv.stat` 使用统计 | 第几次打开、从哪天开始用、累计多久这、次开了多久 | 日志一行；数字存在本地 `PCLData\settings.json` |
+| `pcv.cleaner` 垃圾清理 | 清 3 天前的 `.trash`、7 天前的 `.backup`、两周前的日志 | 日志里逐条写"删了哪个"，没得清就说没得清 |
+
+三个都验过：装进壳里之后 `7 个跑着 / 一共 7 个`，自检报告里的系统行是
+`Windows 11 Pro 26H2 (build 26300)`，统计配置里 `StatStarts` 会真的加一。
+
+两处当时踩到的细节，留在代码注释里了：
+
+- 包一开始有 700 KB，因为 `PCL.Modular.Abstractions` 的 Newtonsoft 依赖被一起复制了。
+  给模块加 `ExcludeAssets="runtime"` 之后降到 3~5 KB —— 模块不该替宿主带依赖。
+- `Environment.OSVersion` 在这个进程里把 Win11 报成 `6.2.9200`（Win8），因为进程没声明支持的系统版本。
+  改成读注册表 `CurrentBuild`，并且 build ≥ 22000 时把名字里的 "Windows 10" 换回 "Windows 11"
+  ——微软自己在注册表里都还写着 Windows 10。

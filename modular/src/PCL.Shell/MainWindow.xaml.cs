@@ -66,12 +66,17 @@ namespace PCL.Shell
             LabFooter.Text = "modules\\　·　logs\\modules.log";
         }
 
+        /// <summary>
+        /// 两个字母的缩写：pcl.core → Co，pcv.cleaner → Cl。
+        /// 只取一个字母的话，core 和 cleaner 会撞成同一个 C，看着像 bug。
+        /// </summary>
         private static string Initial(string moduleId)
         {
             if (string.IsNullOrWhiteSpace(moduleId)) return "?";
-            var tail = moduleId.Split('.').LastOrDefault() ?? moduleId;
-            var first = tail.Trim().FirstOrDefault();
-            return char.IsLetter(first) ? char.ToUpperInvariant(first).ToString() : "P";
+            var tail = (moduleId.Split('.').LastOrDefault() ?? moduleId).Trim();
+            if (tail.Length == 0) return "?";
+            if (tail.Length == 1) return tail.ToUpperInvariant();
+            return char.ToUpperInvariant(tail[0]).ToString() + tail[1];
         }
 
         private static string StateText(ModuleState state)
