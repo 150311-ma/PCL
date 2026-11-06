@@ -251,9 +251,21 @@ namespace PCL.Shell
             var window = new BuildWindow(builder, scriptPath, result => last = result) { Owner = this };
             window.InstallRequested += (s, e) =>
             {
-                if (last?.PackagePath == null) return;
-                window.Close();
-                InstallPackage(last.PackagePath);
+                if (last?.PackagePath == null)
+                {
+                    window.Installed(false, "没找到产物，装不了。");
+                    return;
+                }
+
+                try
+                {
+                    var installed = InstallPackageAutomatically(last.PackagePath);
+                    window.Installed(installed.Success, installed.Message);
+                }
+                catch (Exception ex)
+                {
+                    window.Installed(false, "安装出错：" + ex.Message);
+                }
             };
             window.ShowDialog();
 
@@ -373,6 +385,26 @@ namespace PCL.Shell
         }
 
         // ── 安装 / 卸载 ─────────────────────────────────────────────────────
+
+        /// <summary>自动安装：不弹"已装过要不要覆盖"的确认，直接覆盖并重载。</summary>
+        private InstallResult InstallPackageAutomatically(string path)
+        {
+            var inspection = _installer.Inspect(path);
+            if (!inspection.IsValid)
+                return new InstallResult { Success = false, Message = "包不合规：" + string.Join("；", inspection.Errors.Take(2)) };
+
+            var target = Path.Combine(_installer.ModulesDirectory, inspection.Manifest.Id);
+            var result = _installer.Install(path, Directory.Exists(target));
+
+            if (result.Success)
+            {
+                _report = _host.ReloadAll();
+                RefreshModules();
+                ShowHome();
+            }
+
+            return result;
+        }
 
         private void InstallPackage(string path)
         {

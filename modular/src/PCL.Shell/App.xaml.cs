@@ -63,6 +63,30 @@ namespace PCL.Shell
                 {
                     // 写不了就算了
                 }
+                // 顺手装上：拖进界面也是这条路，行为要一致（--no-install 可跳过）
+                if (result.Success && Array.IndexOf(e.Args, "--no-install") < 0)
+                {
+                    try
+                    {
+                        var installer = new PCL.Modular.Packages.PackageInstaller(
+                            Path.Combine(baseDirectory, "modules"), logger);
+                        var install = installer.Install(result.PackagePath, true);
+                        lines.Add("安装：" + install.Message);
+                        File.WriteAllText(Path.Combine(baseDirectory, "logs", "last-build.log"),
+                            string.Join(Environment.NewLine, lines));
+                        Shutdown(install.Success ? 0 : 3);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        lines.Add("安装出错：" + ex.Message);
+                        File.WriteAllText(Path.Combine(baseDirectory, "logs", "last-build.log"),
+                            string.Join(Environment.NewLine, lines));
+                        Shutdown(4);
+                        return;
+                    }
+                }
+
                 Shutdown(result.Success ? 0 : 2);
                 return;
             }

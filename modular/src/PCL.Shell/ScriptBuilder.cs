@@ -58,12 +58,18 @@ namespace PCL.Shell
                 onLine?.Invoke(line);
             }
 
+            Emit("[工作目录] " + work);
             foreach (var note in notes) Emit("[适配] " + note);
 
+            // 给脚本两个参数，让它不用猜路径：
+            //   [1] 工作目录（产物写这里，用相对路径就是它）
+            //   [2] 契约程序集 PCL.Modular.Abstractions.dll 的绝对路径
+            // 这样提示词里就可以严禁写死任何绝对路径。
+            var contract = Path.Combine(_appDirectory, "PCL.Modular.Abstractions.dll");
             var info = new ProcessStartInfo
             {
                 FileName = PythonPath(),
-                Arguments = "-u \"" + adapted + "\"",
+                Arguments = "-u \"" + adapted + "\" \"" + work + "\" \"" + contract + "\"",
                 WorkingDirectory = work,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,

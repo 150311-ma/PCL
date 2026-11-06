@@ -62,16 +62,42 @@ namespace PCL.Shell
             if (result.Success)
             {
                 Dot.Fill = new SolidColorBrush(Color.FromRgb(0x3D, 0xDC, 0x84));
-                BtnInstall.IsEnabled = true;
-                BtnInstall.Content = "装进 PCV";
+                BtnInstall.IsEnabled = false;
+                BtnInstall.Content = "正在自动安装…";
+
+                // 拖进来就是要"装好"，不是要一个装着安装按钮的窗口
+                InstallRequested?.Invoke(this, EventArgs.Empty);
             }
             else
             {
                 Dot.Fill = new SolidColorBrush(Color.FromRgb(0xF8, 0x51, 0x49));
                 BtnInstall.IsEnabled = false;
+                BtnInstall.Content = "没装成";
             }
 
             _onFinished?.Invoke(result);
+        }
+
+        /// <summary>安装结束（成功或失败）时由外面回调，把窗口切到收尾状态。</summary>
+        public void Installed(bool success, string message)
+        {
+            Append("");
+            Append(message);
+            LabStatus.Text = message;
+            BtnInstall.IsEnabled = false;
+            BtnInstall.Content = success ? "已装好" : "安装失败";
+            BtnInstall.Visibility = Visibility.Visible;
+            Dot.Fill = new SolidColorBrush(success
+                ? Color.FromRgb(0x3D, 0xDC, 0x84)
+                : Color.FromRgb(0xF8, 0x51, 0x49));
+
+            // 装好了 1.5 秒自动关，不占着屏幕
+            if (success)
+            {
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+                timer.Tick += (s, e) => { timer.Stop(); Close(); };
+                timer.Start();
+            }
         }
 
         private void BtnInstall_Click(object sender, RoutedEventArgs e)

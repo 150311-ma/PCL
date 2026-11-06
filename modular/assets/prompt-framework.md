@@ -119,23 +119,41 @@ settings.Save();
 **不要**自己发明 `GetService`、`Get`、`Set`、`Resolve`、`ServiceLocator` 这类名字 —— 宿主没有这些方法。
 拿不准就不要用服务，直接用 `context.DataDirectory` 读写文件也行。
 
+## 路径：只准用相对路径（这一条别商量）
+
+PCV 会把你的脚本放进**它自己的隔离工作目录**里执行，并传两个参数进来：
+
+| 参数 | 是什么 |
+| --- | --- |
+| `sys.argv[1]` | 工作目录。**产物就写这里**，用相对路径 |
+| `sys.argv[2]` | 契约程序集 `PCL.Modular.Abstractions.dll` 的绝对路径（只读引用，别复制进包） |
+
+硬性禁止：
+
+- ❌ 写死 `C://PCV`、`C://Users//...` 这类绝对路径；
+- ❌ 猜 PCV 装在哪、去 `os.environ` 里找 PCV；
+- ❌ 往工作目录外面写文件（中间产物用完自己删）。
+
+产物文件名写在**工作目录**里就行，PCV 会自己找到它并安装。
+
 ## 照着这个骨架写（结构别改，只替换 TODO）
 
 ```python
 import json, os, pathlib, shutil, subprocess, sys, tempfile, zipfile
 
-PCV_DIR   = r"TODO 改成 PCV 的安装目录，例如 C:\\PCV"
+# PCV 传进来的两个参数：工作目录、契约程序集路径。不要自己拼绝对路径。
+WORK_DIR = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
+CONTRACT = sys.argv[2] if len(sys.argv) > 2 else ""
+
 MODULE_ID = "pcv.demo"
 NAME      = "示例框架"
 VERSION   = "1.0.0"
 ASM       = "Pcv.Demo"
 ROOT_NS   = "Pcv.Demo"
 DEPS      = ["pcl.core"]
-OUT_DIR   = pathlib.Path.cwd()
 
-CONTRACT = os.path.join(PCV_DIR, "PCL.Modular.Abstractions.dll")
-if not os.path.isfile(CONTRACT):
-    print(f"找不到契约程序集：{CONTRACT}\n请把 PCV_DIR 改成 PCV 的安装目录。")
+if not CONTRACT or not os.path.isfile(CONTRACT):
+    print("没拿到契约程序集路径（argv[2]）。应当由 PCV 传入，不该自己猜。")
     sys.exit(3)
 
 work = pathlib.Path(tempfile.mkdtemp(prefix="pcv-"))
@@ -205,12 +223,13 @@ namespace TODO_NAMESPACE
         print("编译完了却找不到 dll：" + str(dll))
         sys.exit(5)
 
-    package = OUT_DIR / (MODULE_ID + "-" + VERSION + ".pclpkg")
+    # 产物落在工作目录里，用相对路径
+    package = WORK_DIR / (MODULE_ID + "-" + VERSION + ".pclpkg")
     with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.write(work / "module.json", "module.json")
         zip_file.write(dll, ASM + ".dll")
 
-    print(str(package.resolve()))
+    print(str(package))
 finally:
     shutil.rmtree(work, ignore_errors=True)
 ```
@@ -219,7 +238,7 @@ finally:
 
 0. 代码里**没有** `GetService` / `.Get(` / `.Set(` —— 只有 `TryGet` / `GetValue` / `SetValue`。
 
-1. `id` 带 `pcv.` 前缀，全小写；`assembly` 和 `entry` 与代码完全对应。
+1. `id` 带 `pcv.` 前缀，全小写；`assembly` 和 `entry` 与代码完全对应；**路径全是相对/argv，没有写死的盘符**。
 2. 只引用 `PCL.Modular.Abstractions.dll`，`Private=false`。
 3. 输出的 zip 只有两个文件：`module.json` 和那个 dll。
 4. 编译失败、找不到契约程序集，都走非 0 退出并打印原因。

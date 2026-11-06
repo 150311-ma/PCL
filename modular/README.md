@@ -457,3 +457,51 @@ VB 项目默认只收 `**/*.vb`，`.cs` 文件被无声忽略，于是 dll 里�
 ```bat
 python tools/make_promo.py     :: 产出 promo\PCV-宣传片.mp4
 ```
+
+## 十六、拖脚本全自动 + 相对路径 + 安装程序（2026-11-06 追加）
+
+### 1. 拖进去就是"装好了"
+
+之前拖一个 DeepSeek 的 `.py` 会弹构建窗口，跑完还要点一下"装进 PCV"，产物躺在 `PCLData\build\` 里。
+现在改成：**跑完自动装，装完 1.5 秒自动关窗**，不需要第二次确认，也不会留下"产物文件"让用户自己找。
+
+命令行同样一条路（方便验证）：
+
+```bat
+PCV.exe --build 脚本.py            :: 构建 + 自动安装
+PCV.exe --build 脚本.py --no-install
+```
+
+实测：
+
+```
+[工作目录] ...\PCLData\build\1106-124014-9b48
+构建成功：pcv.rel.demo-1.0.0.pclpkg
+安装：已安装 相对路径示例 1.0.0
+```
+
+### 2. 提示词改成相对路径
+
+AI 不再被要求"把 PCV_DIR 改成安装目录"，而是**严禁写死任何绝对路径**：
+
+| 参数 | 是什么 |
+| --- | --- |
+| `sys.argv[1]` | 工作目录，产物写这里（相对路径） |
+| `sys.argv[2]` | 契约程序集 `PCL.Modular.Abstractions.dll` 的绝对路径 |
+
+宿主在隔离目录 `PCLData\build\<时间>` 里运行脚本，脚本里 `pathlib.Path(".")` 就是沙盒，
+往外面写会被安装器拒绝（解包时也有路径穿越校验）。这样同一份脚本在任何人的机器上都跑得通。
+
+### 3. 安装程序
+
+`installer/PCV.Setup`：单文件 `PCV-Setup-1.0.0.exe`（0.53 MB），不需要任何外部打包工具。
+
+- 装到 `%LOCALAPPDATA%\Programs\PAINCHARNWAV`，**不需要管理员权限**；
+- 解包 → 放 `Uninstall.exe` → 桌面和开始菜单快捷方式 → 写 HKCU 卸载项（设置里能看到）；
+- 卸载走同一个 exe（`--uninstall`）：杀进程、删快捷方式、删注册表，最后交给 cmd 删目录；
+- 自带 `--silent --dir <路径> --no-shortcuts --no-registry`，方便自动化测试和二次分发。
+
+构建：`python tools/build_installer.py`（构建方案 → 摆干净目录 → 打 payload.zip → 编安装器）。
+
+验证过的：静默装到临时目录后 10 个模块齐全、`Uninstall.exe` 就位，
+装出来的 `PCV.exe --render` 能正常出图（说明产物完整，不是只有 exe 没 dll）。
